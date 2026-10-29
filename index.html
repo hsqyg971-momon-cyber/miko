@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>お祓いスラッシュ - 巫女の邪気退散アクション</title>
+  <title>神社の階段のぼり - 巫女の石段駆け上がりアタック</title>
   <style>
     * {
       margin: 0;
@@ -11,13 +11,13 @@
       box-sizing: border-box;
       user-select: none;
       -webkit-user-select: none;
-      touch-action: none;
+      touch-action: manipulation;
     }
     body, html {
       width: 100%;
       height: 100%;
       overflow: hidden;
-      background: radial-gradient(circle at 50% 30%, #30183e 0%, #170d24 70%, #0a0410 100%);
+      background: #111424;
       font-family: 'Hiragino Kaku Gothic ProN', 'Meiryo', sans-serif;
       color: #fff;
       display: flex;
@@ -28,20 +28,16 @@
       position: relative;
       width: 100%;
       height: 100%;
-      max-width: 540px;
-      max-height: 960px;
-      box-shadow: 0 0 35px rgba(255, 120, 180, 0.25);
-      background: #190c23;
+      max-width: 500px;
+      max-height: 900px;
+      background: #1e243b;
+      box-shadow: 0 0 35px rgba(255, 120, 160, 0.25);
       overflow: hidden;
     }
     canvas {
       width: 100%;
       height: 100%;
       display: block;
-    }
-    /* Simple custom UI layer overlay when needed */
-    .hidden {
-      display: none !important;
     }
   </style>
 </head>
@@ -51,70 +47,89 @@
   </div>
 
   <script>
-    // --- Audio Synthesis via Web Audio API (No external sound files required) ---
-    const AudioEngine = {
+    // --- Web Audio API Sound Synthesizer (No external sound files) ---
+    const Sound = {
       ctx: null,
       init() {
         if (!this.ctx) {
           const AudioContext = window.AudioContext || window.webkitAudioContext;
-          if (AudioContext) {
-            this.ctx = new AudioContext();
-          }
+          if (AudioContext) this.ctx = new AudioContext();
         }
         if (this.ctx && this.ctx.state === 'suspended') {
           this.ctx.resume();
         }
       },
-      playSlash() {
+      // Kagura Suzur Bell step sound (Bright chime)
+      playStep(combo = 0) {
+        if (!this.ctx) return;
+        const now = this.ctx.currentTime;
+        const baseFreq = 1600 + Math.min(600, combo * 18);
+        [baseFreq, baseFreq * 1.5, baseFreq * 2].forEach((freq, idx) => {
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(freq, now);
+          gain.gain.setValueAtTime(0.12 / (idx + 1), now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.18 + idx * 0.04);
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc.start(now);
+          osc.stop(now + 0.22);
+        });
+      },
+      // Torii passing ceremonial chord
+      playTorii() {
+        if (!this.ctx) return;
+        const now = this.ctx.currentTime;
+        const chords = [523.25, 659.25, 783.99, 1046.50, 1318.51];
+        chords.forEach((freq, idx) => {
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(freq, now + idx * 0.04);
+          gain.gain.setValueAtTime(0.15, now + idx * 0.04);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.6 + idx * 0.05);
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc.start(now + idx * 0.04);
+          osc.stop(now + 0.7);
+        });
+      },
+      // Magatama / Omamori Item collection
+      playItem() {
         if (!this.ctx) return;
         const now = this.ctx.currentTime;
         const osc = this.ctx.createOscillator();
         const gain = this.ctx.createGain();
-        osc.type = 'triangle';
-        osc.frequency.setValueAtTime(800, now);
-        osc.frequency.exponentialRampToValueAtTime(160, now + 0.12);
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(880, now);
+        osc.frequency.exponentialRampToValueAtTime(1760, now + 0.16);
         gain.gain.setValueAtTime(0.2, now);
-        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.12);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
         osc.connect(gain);
         gain.connect(this.ctx.destination);
         osc.start(now);
-        osc.stop(now + 0.13);
+        osc.stop(now + 0.22);
       },
-      playPurify() {
-        if (!this.ctx) return;
-        const now = this.ctx.currentTime;
-        // Kagura Suzur bell chime (bright bell harmonics)
-        [1760, 2637, 3520].forEach((freq, idx) => {
-          const osc = this.ctx.createOscillator();
-          const gain = this.ctx.createGain();
-          osc.type = 'sine';
-          osc.frequency.setValueAtTime(freq, now + idx * 0.02);
-          gain.gain.setValueAtTime(0.18, now + idx * 0.02);
-          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.5 + idx * 0.05);
-          osc.connect(gain);
-          gain.connect(this.ctx.destination);
-          osc.start(now + idx * 0.02);
-          osc.stop(now + 0.6 + idx * 0.05);
-        });
-      },
-      playMistake() {
+      // Miss / Game Over sound
+      playMiss() {
         if (!this.ctx) return;
         const now = this.ctx.currentTime;
         const osc = this.ctx.createOscillator();
         const gain = this.ctx.createGain();
         osc.type = 'sawtooth';
-        osc.frequency.setValueAtTime(150, now);
-        osc.frequency.linearRampToValueAtTime(80, now + 0.25);
+        osc.frequency.setValueAtTime(220, now);
+        osc.frequency.linearRampToValueAtTime(65, now + 0.35);
         gain.gain.setValueAtTime(0.3, now);
-        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.25);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.35);
         osc.connect(gain);
         gain.connect(this.ctx.destination);
         osc.start(now);
-        osc.stop(now + 0.26);
+        osc.stop(now + 0.36);
       }
     };
 
-    // --- Main Game Setup ---
+    // --- Canvas & Scaling Setup ---
     const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d');
     const container = document.getElementById('game-container');
@@ -124,46 +139,58 @@
     let scale = 1;
 
     // Game States
-    const STATE = {
-      TITLE: 0,
-      PLAYING: 1,
-      GAMEOVER: 2
-    };
+    const STATE = { TITLE: 0, PLAYING: 1, GAMEOVER: 2 };
     let currentState = STATE.TITLE;
 
-    // Load Miko Image
+    // Character Image Loading
     const mikoImg = new Image();
     let isMikoLoaded = false;
     mikoImg.src = 'miko.png';
     mikoImg.onload = () => { isMikoLoaded = true; };
     mikoImg.onerror = () => { isMikoLoaded = false; };
 
-    // Core Game Variables
+    // Game Metrics & Constants
+    const STEP_DY = 62;        // Vertical rise per stair step
+    const STEP_DX = 85;        // Horizontal zig-zag offset
+    const STEP_WIDTH = 130;    // Width of stone stair step
+    const STEP_HEIGHT = 28;    // Thickness of stair step
+    const MAX_TIME = 100;
+
     let score = 0;
-    let combo = 0;
-    let maxCombo = 0;
-    let comboTimer = 0;
-    let life = 3;
-    const MAX_LIFE = 3;
-    let gameTime = 0;
-    let spawnTimer = 0;
-    let difficultySpeed = 1;
+    let highScore = 0;
+    let timer = MAX_TIME;
+    let feverTimer = 0;        // Automatic forward fever rush
 
-    // Entities & Effects
-    let objects = [];
-    let particles = [];
-    let textPopups = [];
-    let mikoAnim = {
-      bounceY: 0,
-      bellRingTime: 0,
-      scaleY: 1
+    // Steps Array: { id, dir: -1|1, x, y, hasTorii, item: null|'magatama'|'omamori' }
+    let steps = [];
+    let currentStepIndex = 0;
+
+    // Player Animation & Camera
+    let player = {
+      x: 0,
+      y: 0,
+      targetX: 0,
+      targetY: 0,
+      facing: 1,      // -1: left, 1: right
+      jumpTimer: 0,
+      squash: 1
     };
+    let cameraY = 0;
+    let targetCameraY = 0;
 
-    // Slash Trail System
-    let slashPoints = [];
-    let isSlashing = false;
+    // Particles & Floating Text
+    let particles = [];
+    let popups = [];
 
-    // Resize Handler
+    // Background Layers: 0: 昼(Day), 1: 夕暮れ(Sunset), 2: 宵闇・満月(Night), 3: 神域(Celestial)
+    function getElevationZone(stepCount) {
+      if (stepCount < 30) return 0;
+      if (stepCount < 70) return 1;
+      if (stepCount < 120) return 2;
+      return 3;
+    }
+
+    // --- Initialization & Resizing ---
     function resizeCanvas() {
       const rect = container.getBoundingClientRect();
       width = rect.width;
@@ -172,7 +199,7 @@
       canvas.width = width * dpr;
       canvas.height = height * dpr;
       ctx.scale(dpr, dpr);
-      scale = width / 400; // Relative layout scale
+      scale = width / 400;
     }
     window.addEventListener('resize', resizeCanvas);
     window.addEventListener('load', () => {
@@ -180,285 +207,320 @@
       requestAnimationFrame(gameLoop);
     });
 
-    // --- Math & Collision Helpers ---
-    function dist(x1, y1, x2, y2) {
-      return Math.hypot(x2 - x1, y2 - y1);
-    }
+    // --- Stage & Stairs Generation ---
+    function generateInitialSteps() {
+      steps = [];
+      let curX = width / 2;
+      let curY = height * 0.72;
 
-    // Check line segment (x1, y1)-(x2, y2) vs circle (cx, cy, r)
-    function checkLineCircleIntersection(x1, y1, x2, y2, cx, cy, r) {
-      const dx = x2 - x1;
-      const dy = y2 - y1;
-      const len = Math.hypot(dx, dy);
-      if (len === 0) return dist(x1, y1, cx, cy) <= r;
+      // Base starting platform (step 0)
+      steps.push({
+        id: 0,
+        dir: 0,
+        x: curX,
+        y: curY,
+        hasTorii: false,
+        item: null
+      });
 
-      const u = Math.max(0, Math.min(1, ((cx - x1) * dx + (cy - y1) * dy) / (len * len)));
-      const nearestX = x1 + u * dx;
-      const nearestY = y1 + u * dy;
-      return dist(cx, cy, nearestX, nearestY) <= r;
-    }
-
-    // --- Input Handling ---
-    function getPointerPos(e) {
-      const rect = canvas.getBoundingClientRect();
-      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-      const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-      return {
-        x: clientX - rect.left,
-        y: clientY - rect.top
-      };
-    }
-
-    function onPointerDown(e) {
-      AudioEngine.init();
-      const pos = getPointerPos(e);
-
-      if (currentState === STATE.TITLE) {
-        // Start button area hit detection
-        const btnY = height * 0.72;
-        if (Math.abs(pos.x - width / 2) < 110 && Math.abs(pos.y - btnY) < 35) {
-          startGame();
-          return;
-        }
-      } else if (currentState === STATE.GAMEOVER) {
-        // Retry button area
-        const btnY = height * 0.76;
-        if (Math.abs(pos.x - width / 2) < 110 && Math.abs(pos.y - btnY) < 35) {
-          startGame();
-          return;
-        }
-      } else if (currentState === STATE.PLAYING) {
-        isSlashing = true;
-        slashPoints = [{ x: pos.x, y: pos.y, time: performance.now() }];
+      // Populate upcoming stairs
+      for (let i = 1; i <= 25; i++) {
+        appendNextStep();
       }
     }
 
-    function onPointerMove(e) {
-      if (!isSlashing || currentState !== STATE.PLAYING) return;
-      const pos = getPointerPos(e);
-      const now = performance.now();
-      const last = slashPoints[slashPoints.length - 1];
+    function appendNextStep() {
+      const last = steps[steps.length - 1];
+      const nextId = last.id + 1;
 
-      if (!last || dist(last.x, last.y, pos.x, pos.y) > 4) {
-        slashPoints.push({ x: pos.x, y: pos.y, time: now });
-        if (last) {
-          testSlashCollision(last, pos);
-        }
+      // Determine step direction: -1 (left) or 1 (right)
+      let nextDir;
+      if (last.dir === 0) {
+        nextDir = Math.random() < 0.5 ? -1 : 1;
+      } else {
+        // Bias slightly toward alternating to maintain centered flow
+        const continueChance = (last.x < width * 0.35) ? 0.2 : (last.x > width * 0.65 ? 0.2 : 0.45);
+        nextDir = (Math.random() < continueChance) ? last.dir : -last.dir;
       }
-    }
 
-    function onPointerUp() {
-      isSlashing = false;
-    }
+      const nextX = last.x + nextDir * STEP_DX;
+      const nextY = last.y - STEP_DY;
 
-    canvas.addEventListener('mousedown', onPointerDown);
-    canvas.addEventListener('mousemove', onPointerMove);
-    window.addEventListener('mouseup', onPointerUp);
+      // Torii checkpoint gates every 25 steps
+      const hasTorii = (nextId % 25 === 0);
 
-    canvas.addEventListener('touchstart', (e) => { e.preventDefault(); onPointerDown(e); }, { passive: false });
-    canvas.addEventListener('touchmove', (e) => { e.preventDefault(); onPointerMove(e); }, { passive: false });
-    window.addEventListener('touchend', onPointerUp);
+      // Occasional sacred item drops (Magatama or Omamori)
+      let item = null;
+      if (!hasTorii && Math.random() < 0.12) {
+        item = Math.random() < 0.5 ? 'magatama' : 'omamori';
+      }
 
-    // --- Game Logic ---
-    function startGame() {
-      score = 0;
-      combo = 0;
-      maxCombo = 0;
-      comboTimer = 0;
-      life = MAX_LIFE;
-      gameTime = 0;
-      spawnTimer = 0;
-      difficultySpeed = 1;
-      objects = [];
-      particles = [];
-      textPopups = [];
-      slashPoints = [];
-      currentState = STATE.PLAYING;
-    }
-
-    function spawnObject() {
-      // 82% 邪気玉 (Evil Aura), 18% お供え物 (Dango / Apple)
-      const isOffer = Math.random() < 0.18;
-      const offerType = Math.random() < 0.5 ? 'dango' : 'apple';
-      const radius = isOffer ? 22 : 24 + Math.random() * 4;
-      const x = radius + Math.random() * (width - radius * 2);
-      const baseSpeed = (160 + Math.random() * 90) * difficultySpeed;
-
-      objects.push({
-        x: x,
-        y: -radius - 10,
-        radius: radius,
-        speedY: baseSpeed / 60,
-        speedX: (Math.random() - 0.5) * 1.5,
-        type: isOffer ? 'offer' : 'evil',
-        offerVariant: offerType,
-        angle: 0,
-        rotSpeed: (Math.random() - 0.5) * 0.05,
-        pulse: Math.random() * Math.PI * 2,
-        sliced: false
+      steps.push({
+        id: nextId,
+        dir: nextDir,
+        x: nextX,
+        y: nextY,
+        hasTorii: hasTorii,
+        item: item
       });
     }
 
-    function testSlashCollision(p1, p2) {
-      AudioEngine.playSlash();
-      for (let i = objects.length - 1; i >= 0; i--) {
-        const obj = objects[i];
-        if (obj.sliced) continue;
+    // --- Game Lifecycle ---
+    function startGame() {
+      score = 0;
+      timer = MAX_TIME;
+      feverTimer = 0;
+      particles = [];
+      popups = [];
+      currentStepIndex = 0;
 
-        if (checkLineCircleIntersection(p1.x, p1.y, p2.x, p2.y, obj.x, obj.y, obj.radius)) {
-          obj.sliced = true;
-          handleCut(obj);
-          objects.splice(i, 1);
-        }
-      }
+      generateInitialSteps();
+
+      const startStep = steps[0];
+      player.x = startStep.x;
+      player.y = startStep.y - 12;
+      player.targetX = player.x;
+      player.targetY = player.y;
+      player.facing = 1;
+      player.jumpTimer = 0;
+      player.squash = 1;
+
+      cameraY = player.y - height * 0.68;
+      targetCameraY = cameraY;
+
+      currentState = STATE.PLAYING;
     }
 
-    function handleCut(obj) {
-      if (obj.type === 'evil') {
-        // Successful purification
-        combo++;
-        if (combo > maxCombo) maxCombo = combo;
-        comboTimer = 140; // ~2.3 seconds combo grace period
+    function handlePlayerStep(inputDir) { // -1: Left, 1: Right
+      if (currentState !== STATE.PLAYING) return;
+      Sound.init();
 
-        const multiplier = 1 + Math.floor(combo / 5) * 0.5;
-        const gainedScore = Math.floor(100 * multiplier);
-        score += gainedScore;
+      const nextStep = steps[currentStepIndex + 1];
+      if (!nextStep) return;
 
-        AudioEngine.playPurify();
+      // If fever active, ignore misdirection and proceed
+      const isCorrect = (feverTimer > 0) || (inputDir === nextStep.dir);
 
-        // Miko Reaction Trigger
-        mikoAnim.bounceY = -22;
-        mikoAnim.bellRingTime = 30;
+      if (isCorrect) {
+        currentStepIndex++;
+        score = nextStep.id;
+        if (score > highScore) highScore = score;
 
-        // Visual feedback
-        createPurifyParticles(obj.x, obj.y);
-        addTextPopup(`+${gainedScore}`, obj.x, obj.y - 10, '#ffd166');
-        if (combo > 1) {
-          addTextPopup(`${combo} COMBO!`, obj.x, obj.y - 32, '#06d6a0');
+        // Advance player motion
+        player.facing = nextStep.dir !== 0 ? nextStep.dir : player.facing;
+        player.targetX = nextStep.x;
+        player.targetY = nextStep.y - 12;
+        player.jumpTimer = 1;
+        player.squash = 0.8;
+
+        // Restore timer (decay gets tighter as height increases)
+        const timeBonus = Math.max(8, 22 - Math.floor(score / 15));
+        timer = Math.min(MAX_TIME, timer + timeBonus);
+
+        // Sound & Particles
+        Sound.playStep(score);
+        spawnStepParticles(player.x, player.y + 15);
+
+        // Check Items on step
+        if (nextStep.item) {
+          if (nextStep.item === 'magatama') {
+            Sound.playItem();
+            feverTimer = 120; // 2 seconds of divine rush
+            addPopup('勾玉神威！(無敵ダッシュ)', player.x, player.y - 45, '#06d6a0');
+          } else if (nextStep.item === 'omamori') {
+            Sound.playItem();
+            timer = MAX_TIME;
+            addPopup('御守加護！(時間全快)', player.x, player.y - 45, '#ffd166');
+          }
+          nextStep.item = null;
+        }
+
+        // Torii passage celebration
+        if (nextStep.hasTorii) {
+          Sound.playTorii();
+          spawnToriiCelebration(nextStep.x, nextStep.y - 60);
+          addPopup(`参道突破！【第 ${score} 段】`, width / 2, height * 0.35, '#ff758f');
+        }
+
+        // Camera target update
+        targetCameraY = player.targetY - height * 0.68;
+
+        // Keep buffer of stairs ahead
+        if (steps.length - currentStepIndex < 20) {
+          appendNextStep();
         }
       } else {
-        // Slashed sacred offering!
-        combo = 0;
-        life = Math.max(0, life - 1);
-        AudioEngine.playMistake();
-        createMistakeParticles(obj.x, obj.y);
-        addTextPopup(`お供え物を斬ってしまった！`, obj.x, obj.y - 15, '#ff4d6d');
-
-        if (life <= 0) {
-          gameOver();
-        }
+        // Misstep! Fell off the stairs
+        Sound.playMiss();
+        spawnMissParticles(player.x, player.y);
+        gameOver();
       }
     }
 
     function gameOver() {
       currentState = STATE.GAMEOVER;
-      isSlashing = false;
+      player.targetY += 120; // Falling down motion
     }
 
-    // --- Particle & Text Effects ---
-    function createPurifyParticles(x, y) {
-      // Golden sacred bell rings & sakura lights
-      for (let i = 0; i < 20; i++) {
+    // --- Particle and Feedback FX ---
+    function spawnStepParticles(x, y) {
+      for (let i = 0; i < 8; i++) {
         const ang = Math.random() * Math.PI * 2;
-        const spd = 2 + Math.random() * 5;
+        const speed = 1 + Math.random() * 3;
         particles.push({
           x: x,
           y: y,
-          vx: Math.cos(ang) * spd,
-          vy: Math.sin(ang) * spd - 1,
-          size: 3 + Math.random() * 4,
+          vx: Math.cos(ang) * speed,
+          vy: Math.sin(ang) * speed - 1.2,
+          size: 3 + Math.random() * 3,
+          color: Math.random() < 0.6 ? '#ffb3c6' : '#fff480', // Sakura petal or gold bell dust
           life: 1,
-          decay: 0.025 + Math.random() * 0.02,
-          color: ['#fff', '#ffe169', '#ff9ebb', '#b5e2fa'][Math.floor(Math.random() * 4)],
-          shape: Math.random() < 0.3 ? 'star' : 'circle'
+          decay: 0.035 + Math.random() * 0.02,
+          isPetal: true
         });
       }
     }
 
-    function createMistakeParticles(x, y) {
-      for (let i = 0; i < 15; i++) {
+    function spawnToriiCelebration(x, y) {
+      for (let i = 0; i < 35; i++) {
         const ang = Math.random() * Math.PI * 2;
-        const spd = 2 + Math.random() * 3.5;
+        const spd = 2 + Math.random() * 6;
+        particles.push({
+          x: x,
+          y: y,
+          vx: Math.cos(ang) * spd,
+          vy: Math.sin(ang) * spd - 2,
+          size: 4 + Math.random() * 4,
+          color: ['#ffd166', '#ff758f', '#06d6a0', '#ffffff'][Math.floor(Math.random() * 4)],
+          life: 1,
+          decay: 0.02 + Math.random() * 0.015,
+          isPetal: false
+        });
+      }
+    }
+
+    function spawnMissParticles(x, y) {
+      for (let i = 0; i < 18; i++) {
+        const ang = Math.random() * Math.PI * 2;
+        const spd = 1.5 + Math.random() * 4;
         particles.push({
           x: x,
           y: y,
           vx: Math.cos(ang) * spd,
           vy: Math.sin(ang) * spd,
-          size: 4 + Math.random() * 3,
+          size: 4 + Math.random() * 4,
+          color: '#ff4d6d',
           life: 1,
           decay: 0.03,
-          color: '#ff3366',
-          shape: 'circle'
+          isPetal: false
         });
       }
     }
 
-    function addTextPopup(text, x, y, color) {
-      textPopups.push({
-        text: text,
-        x: Math.max(50, Math.min(width - 50, x)),
-        y: y,
+    function addPopup(text, x, y, color) {
+      popups.push({
+        text,
+        x,
+        y,
+        color,
         vy: -1.2,
         life: 1,
-        decay: 0.02,
-        color: color
+        decay: 0.022
       });
     }
 
-    // --- Update Loops ---
+    // --- Inputs Handling ---
+    function onLeftAction() {
+      if (currentState === STATE.PLAYING) {
+        handlePlayerStep(-1);
+      }
+    }
+    function onRightAction() {
+      if (currentState === STATE.PLAYING) {
+        handlePlayerStep(1);
+      }
+    }
+
+    window.addEventListener('keydown', (e) => {
+      if (e.repeat) return;
+      if (currentState === STATE.PLAYING) {
+        if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') {
+          onLeftAction();
+        } else if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') {
+          onRightAction();
+        }
+      } else if (e.key === ' ' || e.key === 'Enter') {
+        if (currentState === STATE.TITLE || currentState === STATE.GAMEOVER) {
+          startGame();
+        }
+      }
+    });
+
+    function handlePointer(clientX, clientY) {
+      Sound.init();
+      const rect = canvas.getBoundingClientRect();
+      const px = clientX - rect.left;
+      const py = clientY - rect.top;
+
+      if (currentState === STATE.TITLE) {
+        const btnY = height * 0.74;
+        if (Math.abs(px - width / 2) < 110 && Math.abs(py - btnY) < 32) {
+          startGame();
+        }
+      } else if (currentState === STATE.GAMEOVER) {
+        const btnY = height * 0.76;
+        if (Math.abs(px - width / 2) < 110 && Math.abs(py - btnY) < 32) {
+          startGame();
+        }
+      } else if (currentState === STATE.PLAYING) {
+        if (px < width * 0.5) {
+          onLeftAction();
+        } else {
+          onRightAction();
+        }
+      }
+    }
+
+    canvas.addEventListener('mousedown', (e) => handlePointer(e.clientX, e.clientY));
+    canvas.addEventListener('touchstart', (e) => {
+      e.preventDefault();
+      const touch = e.touches[0];
+      handlePointer(touch.clientX, touch.clientY);
+    }, { passive: false });
+
+    // --- Update Loop ---
     function update(dt) {
-      gameTime += dt;
-      difficultySpeed = 1 + Math.min(1.2, gameTime / 70); // Gradually ramps up
+      // Camera smooth damping
+      cameraY += (targetCameraY - cameraY) * 0.22;
 
-      // Slash Trail cleanup (older than 160ms fades)
-      const now = performance.now();
-      slashPoints = slashPoints.filter(p => now - p.time < 160);
+      // Player smooth interpolation
+      player.x += (player.targetX - player.x) * 0.35;
+      player.y += (player.targetY - player.y) * 0.35;
 
-      // Miko Animation update
-      mikoAnim.bounceY += (0 - mikoAnim.bounceY) * 0.12;
-      if (mikoAnim.bellRingTime > 0) mikoAnim.bellRingTime--;
-
-      if (currentState !== STATE.PLAYING) return;
-
-      // Combo Decay
-      if (comboTimer > 0) {
-        comboTimer--;
-        if (comboTimer <= 0) combo = 0;
+      // Jump arc easing
+      if (player.jumpTimer > 0) {
+        player.jumpTimer -= 0.12;
+        if (player.jumpTimer < 0) player.jumpTimer = 0;
       }
+      player.squash += (1 - player.squash) * 0.18;
 
-      // Spawning
-      spawnTimer++;
-      const nextSpawnRate = Math.max(32, Math.floor(65 / difficultySpeed));
-      if (spawnTimer >= nextSpawnRate) {
-        spawnTimer = 0;
-        spawnObject();
-      }
-
-      // Update Falling Objects
-      for (let i = objects.length - 1; i >= 0; i--) {
-        const obj = objects[i];
-        obj.y += obj.speedY;
-        obj.x += obj.speedX;
-        obj.angle += obj.rotSpeed;
-        obj.pulse += 0.08;
-
-        // Screen boundary bounce
-        if (obj.x < obj.radius || obj.x > width - obj.radius) {
-          obj.speedX *= -1;
+      if (currentState === STATE.PLAYING) {
+        // Fever handling (auto rush step every few frames)
+        if (feverTimer > 0) {
+          feverTimer--;
+          if (feverTimer % 14 === 0) {
+            const nextStep = steps[currentStepIndex + 1];
+            if (nextStep) handlePlayerStep(nextStep.dir);
+          }
         }
 
-        // Missed evil aura reaches bottom
-        if (obj.y - obj.radius > height) {
-          if (obj.type === 'evil') {
-            combo = 0;
-            life = Math.max(0, life - 1);
-            AudioEngine.playMistake();
-            addTextPopup('邪気を見失った！', obj.x, height - 40, '#ff4d6d');
-            if (life <= 0) {
-              gameOver();
-            }
-          }
-          objects.splice(i, 1);
+        // Time decay rate increases with score
+        const drainMultiplier = 1 + Math.min(2.2, score / 40);
+        timer -= 0.32 * drainMultiplier;
+        if (timer <= 0) {
+          timer = 0;
+          Sound.playMiss();
+          gameOver();
         }
       }
 
@@ -467,450 +529,510 @@
         const p = particles[i];
         p.x += p.vx;
         p.y += p.vy;
-        p.vy += 0.08; // Gravity
+        p.vy += p.isPetal ? 0.03 : 0.08;
         p.life -= p.decay;
         if (p.life <= 0) particles.splice(i, 1);
       }
 
-      // Update Text Popups
-      for (let i = textPopups.length - 1; i >= 0; i--) {
-        const tp = textPopups[i];
-        tp.y += tp.vy;
-        tp.life -= tp.decay;
-        if (tp.life <= 0) textPopups.splice(i, 1);
+      // Update Popups
+      for (let i = popups.length - 1; i >= 0; i--) {
+        const pop = popups[i];
+        pop.y += pop.vy;
+        pop.life -= pop.decay;
+        if (pop.life <= 0) popups.splice(i, 1);
       }
     }
 
-    // --- Rendering Functions ---
+    // --- Rendering Routines ---
 
-    function drawBackground() {
-      // Atmospheric shrine night background with soft moon glow and sacred torii silhouette
+    function drawDynamicBackground() {
+      const zone = getElevationZone(score);
+
+      // Gradient sets for 4 altitude themes
+      const skyThemes = [
+        ['#c2e9fb', '#e2ebf0', '#ffffff'], // 0: 昼の晴れ空・参道
+        ['#ff7e5f', '#feb47b', '#4a2545'], // 1: 茜色の夕焼け
+        ['#1b1c3a', '#2c1e4a', '#0d0d1e'], // 2: 宵闇・満月
+        ['#0f051d', '#3b0d4f', '#721b65']  // 3: 神域・星辰
+      ];
+
+      const colors = skyThemes[zone];
       const grad = ctx.createLinearGradient(0, 0, 0, height);
-      grad.addColorStop(0, '#1c0e2a');
-      grad.addColorStop(0.65, '#2e183f');
-      grad.addColorStop(1, '#11091a');
+      grad.addColorStop(0, colors[0]);
+      grad.addColorStop(0.5, colors[1]);
+      grad.addColorStop(1, colors[2]);
       ctx.fillStyle = grad;
       ctx.fillRect(0, 0, width, height);
 
-      // Sacred moon glow
-      const moonGrad = ctx.createRadialGradient(width * 0.5, height * 0.18, 10, width * 0.5, height * 0.18, 120);
-      moonGrad.addColorStop(0, 'rgba(255, 235, 215, 0.45)');
-      moonGrad.addColorStop(0.5, 'rgba(255, 200, 220, 0.15)');
-      moonGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
-      ctx.fillStyle = moonGrad;
-      ctx.beginPath();
-      ctx.arc(width * 0.5, height * 0.18, 120, 0, Math.PI * 2);
-      ctx.fill();
-
-      // Distant Torii silhouette at bottom
+      // Atmosphere elements: Sun, Moon, or celestial halo
       ctx.save();
-      ctx.fillStyle = 'rgba(20, 10, 30, 0.65)';
-      const toriiW = 140;
-      const toriiX = width / 2;
-      const toriiY = height - 50;
-      // Pillars
-      ctx.fillRect(toriiX - toriiW * 0.35, toriiY - 110, 10, 120);
-      ctx.fillRect(toriiX + toriiW * 0.35 - 10, toriiY - 110, 10, 120);
-      // Top beams
-      ctx.fillRect(toriiX - toriiW * 0.5, toriiY - 110, toriiW, 11);
-      ctx.fillRect(toriiX - toriiW * 0.42, toriiY - 95, toriiW * 0.84, 8);
-      ctx.restore();
-    }
-
-    // Draw Evil Aura Object
-    function drawEvilAura(obj) {
-      ctx.save();
-      ctx.translate(obj.x, obj.y);
-
-      const pulseSize = Math.sin(obj.pulse) * 3;
-      const r = obj.radius + pulseSize;
-
-      // Outer ominous miasma
-      const outerGlow = ctx.createRadialGradient(0, 0, r * 0.2, 0, 0, r * 1.5);
-      outerGlow.addColorStop(0, 'rgba(170, 0, 255, 0.65)');
-      outerGlow.addColorStop(0.6, 'rgba(80, 0, 120, 0.3)');
-      outerGlow.addColorStop(1, 'rgba(0, 0, 0, 0)');
-      ctx.fillStyle = outerGlow;
-      ctx.beginPath();
-      ctx.arc(0, 0, r * 1.5, 0, Math.PI * 2);
-      ctx.fill();
-
-      // Swirling spikes
-      ctx.rotate(obj.angle);
-      ctx.fillStyle = '#260438';
-      ctx.beginPath();
-      for (let i = 0; i < 8; i++) {
-        const rad = (i / 8) * Math.PI * 2;
-        const outerR = (i % 2 === 0) ? r * 1.25 : r * 0.8;
-        const px = Math.cos(rad) * outerR;
-        const py = Math.sin(rad) * outerR;
-        if (i === 0) ctx.moveTo(px, py);
-        else ctx.lineTo(px, py);
+      if (zone === 0) {
+        // Bright sunlight orb
+        ctx.fillStyle = 'rgba(255, 250, 220, 0.4)';
+        ctx.beginPath();
+        ctx.arc(width * 0.8, height * 0.2, 55, 0, Math.PI * 2);
+        ctx.fill();
+      } else if (zone === 1) {
+        // Setting amber sun
+        ctx.fillStyle = 'rgba(255, 170, 80, 0.55)';
+        ctx.beginPath();
+        ctx.arc(width * 0.5, height * 0.26, 45, 0, Math.PI * 2);
+        ctx.fill();
+      } else {
+        // Mystical Full Moon with holy aura
+        const moonGrad = ctx.createRadialGradient(width * 0.75, height * 0.18, 5, width * 0.75, height * 0.18, 60);
+        moonGrad.addColorStop(0, '#fffdf0');
+        moonGrad.addColorStop(0.35, 'rgba(255, 248, 200, 0.75)');
+        moonGrad.addColorStop(1, 'rgba(255, 240, 180, 0)');
+        ctx.fillStyle = moonGrad;
+        ctx.beginPath();
+        ctx.arc(width * 0.75, height * 0.18, 60, 0, Math.PI * 2);
+        ctx.fill();
       }
+
+      // Distant mountain ridge silhouette
+      ctx.fillStyle = zone === 0 ? 'rgba(140, 175, 195, 0.35)' : 'rgba(15, 8, 25, 0.45)';
+      ctx.beginPath();
+      ctx.moveTo(0, height * 0.8);
+      ctx.lineTo(width * 0.3, height * 0.65);
+      ctx.lineTo(width * 0.7, height * 0.75);
+      ctx.lineTo(width, height * 0.62);
+      ctx.lineTo(width, height);
+      ctx.lineTo(0, height);
       ctx.closePath();
       ctx.fill();
 
-      // Core Dark Orb with eerie glowing eye
-      const coreGrad = ctx.createRadialGradient(-r * 0.2, -r * 0.2, 2, 0, 0, r * 0.85);
-      coreGrad.addColorStop(0, '#be185d');
-      coreGrad.addColorStop(0.6, '#4a044e');
-      coreGrad.addColorStop(1, '#1e0527');
-      ctx.fillStyle = coreGrad;
-      ctx.beginPath();
-      ctx.arc(0, 0, r * 0.85, 0, Math.PI * 2);
-      ctx.fill();
-
-      // Glowing malevolent glint
-      ctx.fillStyle = '#ff758f';
-      ctx.beginPath();
-      ctx.arc(-r * 0.25, -r * 0.25, r * 0.2, 0, Math.PI * 2);
-      ctx.fill();
-
+      // Distant sacred pine trees
+      ctx.fillStyle = zone === 0 ? 'rgba(70, 110, 100, 0.3)' : 'rgba(10, 5, 20, 0.6)';
+      for (let i = 0; i < 6; i++) {
+        const tx = (i * 85) % width;
+        const ty = height * 0.72 + (i % 3) * 12;
+        ctx.beginPath();
+        ctx.moveTo(tx, ty);
+        ctx.lineTo(tx - 18, ty + 45);
+        ctx.lineTo(tx + 18, ty + 45);
+        ctx.closePath();
+        ctx.fill();
+      }
       ctx.restore();
     }
 
-    // Draw Sacred Offering (Dango or Apple)
-    function drawOffer(obj) {
+    // Draw Stairs & Scenic Torii Gates
+    function drawStairs() {
       ctx.save();
-      ctx.translate(obj.x, obj.y);
-      ctx.rotate(obj.angle);
+      ctx.translate(0, -cameraY);
 
-      // Sacred golden glow
-      const aura = ctx.createRadialGradient(0, 0, 5, 0, 0, obj.radius * 1.4);
-      aura.addColorStop(0, 'rgba(255, 230, 140, 0.6)');
-      aura.addColorStop(1, 'rgba(255, 230, 140, 0)');
-      ctx.fillStyle = aura;
-      ctx.beginPath();
-      ctx.arc(0, 0, obj.radius * 1.4, 0, Math.PI * 2);
-      ctx.fill();
+      const viewTop = cameraY - 100;
+      const viewBottom = cameraY + height + 100;
 
-      if (obj.offerVariant === 'dango') {
-        // Skewer
-        ctx.strokeStyle = '#c89650';
-        ctx.lineWidth = 4;
-        ctx.lineCap = 'round';
+      for (let i = 0; i < steps.length; i++) {
+        const s = steps[i];
+        if (s.y < viewTop || s.y > viewBottom) continue;
+
+        const isCurrent = (i === currentStepIndex);
+        const isPassed = (i < currentStepIndex);
+
+        // Stone stair surface
+        ctx.save();
+        ctx.translate(s.x, s.y);
+
+        // Step shadow
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
         ctx.beginPath();
-        ctx.moveTo(0, -obj.radius * 1.2);
-        ctx.lineTo(0, obj.radius * 1.3);
-        ctx.stroke();
+        ctx.roundRect(-STEP_WIDTH / 2 + 3, 5, STEP_WIDTH, STEP_HEIGHT, 6);
+        ctx.fill();
 
-        // 3 Sanshoku Dango: Pink, White, Green
-        const colors = ['#ff99b0', '#ffffff', '#90e090'];
-        const offsets = [-14, 0, 14];
-        for (let k = 0; k < 3; k++) {
-          ctx.beginPath();
-          ctx.fillStyle = colors[k];
-          ctx.arc(0, offsets[k], 9.5, 0, Math.PI * 2);
-          ctx.fill();
-          ctx.strokeStyle = '#deb887';
-          ctx.lineWidth = 1;
-          ctx.stroke();
+        // Step Stone slab
+        const stoneGrad = ctx.createLinearGradient(0, -STEP_HEIGHT / 2, 0, STEP_HEIGHT / 2);
+        if (isCurrent) {
+          stoneGrad.addColorStop(0, '#f9ece5');
+          stoneGrad.addColorStop(1, '#d5b9aa');
+        } else if (isPassed) {
+          stoneGrad.addColorStop(0, '#777b88');
+          stoneGrad.addColorStop(1, '#565a66');
+        } else {
+          stoneGrad.addColorStop(0, '#e5e9f0');
+          stoneGrad.addColorStop(1, '#a6b0c2');
         }
-      } else {
-        // Glossy sacred Apple
-        ctx.fillStyle = '#e63946';
-        ctx.beginPath();
-        ctx.arc(-5, 0, 11, 0, Math.PI * 2);
-        ctx.arc(5, 0, 11, 0, Math.PI * 2);
-        ctx.fill();
 
-        // Stem & Leaf
-        ctx.strokeStyle = '#6b4226';
-        ctx.lineWidth = 3;
+        ctx.fillStyle = stoneGrad;
+        ctx.strokeStyle = isCurrent ? '#ff85a1' : '#495057';
+        ctx.lineWidth = isCurrent ? 2 : 1;
         ctx.beginPath();
-        ctx.moveTo(0, -9);
-        ctx.quadraticCurveTo(4, -16, 2, -18);
+        ctx.roundRect(-STEP_WIDTH / 2, -STEP_HEIGHT / 2, STEP_WIDTH, STEP_HEIGHT, 6);
+        ctx.fill();
         ctx.stroke();
 
-        ctx.fillStyle = '#52b788';
-        ctx.beginPath();
-        ctx.ellipse(5, -15, 6, 3, Math.PI / 4, 0, Math.PI * 2);
-        ctx.fill();
+        // Step number engraving on step 0 and milestones
+        if (s.id % 5 === 0) {
+          ctx.fillStyle = isCurrent ? '#d90429' : 'rgba(50, 50, 60, 0.6)';
+          ctx.font = 'bold 11px sans-serif';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(`${s.id}段`, 0, 1);
+        }
+
+        // Draw Sacred Torii Gate across this step
+        if (s.hasTorii) {
+          drawToriiGate(0, -STEP_HEIGHT / 2);
+        }
+
+        // Draw Collectible Item on step
+        if (s.item) {
+          drawItem(s.item, 0, -STEP_HEIGHT / 2 - 14);
+        }
+
+        ctx.restore();
       }
 
       ctx.restore();
     }
 
-    // Draw Miko Character at Bottom Left with Animation
-    function drawMikoCharacter() {
+    // Draw Vermilion Torii Gate
+    function drawToriiGate(x, y) {
       ctx.save();
-      const mikoSize = 135 * scale;
-      const mikoX = 15;
-      const mikoY = height - mikoSize - 5 + mikoAnim.bounceY;
+      ctx.translate(x, y);
 
-      // Draw Bell Rings (Sound waves radiating when successful)
-      if (mikoAnim.bellRingTime > 0) {
-        const ringProgress = (30 - mikoAnim.bellRingTime) / 30;
-        ctx.strokeStyle = `rgba(255, 215, 0, ${1 - ringProgress})`;
-        ctx.lineWidth = 3;
+      const tw = STEP_WIDTH * 1.35;
+      const th = 85;
+
+      // Vermilion paint & black accents
+      const toriiRed = '#d90429';
+      const toriiBlack = '#1a1a1a';
+
+      // Pillars
+      ctx.fillStyle = toriiRed;
+      ctx.fillRect(-tw * 0.45, -th, 12, th);
+      ctx.fillRect(tw * 0.45 - 12, -th, 12, th);
+
+      // Pillar stone bases
+      ctx.fillStyle = '#495057';
+      ctx.fillRect(-tw * 0.45 - 2, -4, 16, 6);
+      ctx.fillRect(tw * 0.45 - 14, -4, 16, 6);
+
+      // Lower crossbar (Nuki)
+      ctx.fillStyle = toriiRed;
+      ctx.fillRect(-tw * 0.52, -th + 26, tw * 1.04, 8);
+
+      // Upper main crossbar (Kasagi) with curve
+      ctx.fillStyle = toriiBlack;
+      ctx.beginPath();
+      ctx.moveTo(-tw * 0.6, -th);
+      ctx.lineTo(tw * 0.6, -th);
+      ctx.lineTo(tw * 0.56, -th + 10);
+      ctx.lineTo(-tw * 0.56, -th + 10);
+      ctx.closePath();
+      ctx.fill();
+
+      // Kasagi top vermilion line
+      ctx.fillStyle = toriiRed;
+      ctx.fillRect(-tw * 0.56, -th + 10, tw * 1.12, 10);
+
+      // Central Shinto Tablet plaque (Gakuzuka)
+      ctx.fillStyle = toriiBlack;
+      ctx.fillRect(-10, -th + 10, 20, 24);
+      ctx.strokeStyle = '#ffd166';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(-9, -th + 11, 18, 22);
+
+      ctx.fillStyle = '#ffd166';
+      ctx.font = 'bold 9px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('奉', 0, -th + 21);
+      ctx.fillText('納', 0, -th + 30);
+
+      ctx.restore();
+    }
+
+    // Draw Magatama or Omamori Item
+    function drawItem(type, x, y) {
+      ctx.save();
+      ctx.translate(x, y + Math.sin(Date.now() * 0.006) * 4);
+
+      if (type === 'magatama') {
+        // Glowing Green Magatama
+        ctx.shadowColor = '#06d6a0';
+        ctx.shadowBlur = 12;
+        ctx.fillStyle = '#06d6a0';
         ctx.beginPath();
-        ctx.arc(mikoX + mikoSize * 0.72, mikoY + mikoSize * 0.62, 10 + ringProgress * 45, 0, Math.PI * 2);
+        ctx.arc(0, -4, 9, Math.PI * 0.4, Math.PI * 1.7);
+        ctx.quadraticCurveTo(8, 8, 0, 11);
+        ctx.quadraticCurveTo(-2, 4, 0, -4);
+        ctx.fill();
+
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        ctx.arc(0, -4, 2.5, 0, Math.PI * 2);
+        ctx.fill();
+      } else {
+        // Golden Brocade Omamori (Amulet)
+        ctx.shadowColor = '#ffd166';
+        ctx.shadowBlur = 10;
+        ctx.fillStyle = '#e63946';
+        ctx.beginPath();
+        ctx.moveTo(-10, -12);
+        ctx.lineTo(10, -12);
+        ctx.lineTo(12, 12);
+        ctx.lineTo(-12, 12);
+        ctx.closePath();
+        ctx.fill();
+
+        // White knot & gold kanji
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(0, -12);
+        ctx.lineTo(0, -18);
         ctx.stroke();
 
-        // Sparkle stars
-        ctx.fillStyle = '#fff480';
-        ctx.font = '16px sans-serif';
-        ctx.fillText('✨', mikoX + mikoSize * 0.65 - ringProgress * 15, mikoY + mikoSize * 0.5 - ringProgress * 25);
+        ctx.fillStyle = '#ffd166';
+        ctx.font = 'bold 8px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('守', 0, 4);
+      }
+      ctx.restore();
+    }
+
+    // Draw Miko Character Player
+    function drawPlayer() {
+      ctx.save();
+      ctx.translate(0, -cameraY);
+
+      // Jump arc calculation
+      const jumpArc = Math.sin(player.jumpTimer * Math.PI) * 22;
+      const px = player.x;
+      const py = player.y - jumpArc;
+
+      ctx.translate(px, py);
+      ctx.scale(player.facing, player.squash); // Face left/right & squash
+
+      const charSize = 84 * scale;
+
+      // Divine fever aura
+      if (feverTimer > 0) {
+        ctx.shadowColor = '#06d6a0';
+        ctx.shadowBlur = 18;
+        ctx.strokeStyle = 'rgba(6, 214, 160, 0.8)';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.arc(0, -charSize * 0.45, charSize * 0.48, 0, Math.PI * 2);
+        ctx.stroke();
       }
 
       if (isMikoLoaded) {
-        // Draw provided chibi miko image
-        ctx.shadowColor = 'rgba(255, 182, 193, 0.45)';
-        ctx.shadowBlur = 15;
-        // Rounded card frame for clean look
+        // Draw Chibi Miko avatar inside circular badge
+        ctx.shadowColor = 'rgba(255, 182, 193, 0.6)';
+        ctx.shadowBlur = 10;
+
         ctx.save();
         ctx.beginPath();
-        ctx.arc(mikoX + mikoSize * 0.5, mikoY + mikoSize * 0.5, mikoSize * 0.48, 0, Math.PI * 2);
+        ctx.arc(0, -charSize * 0.45, charSize * 0.45, 0, Math.PI * 2);
         ctx.clip();
-        ctx.drawImage(mikoImg, mikoX, mikoY, mikoSize, mikoSize);
+        ctx.drawImage(mikoImg, -charSize / 2, -charSize * 0.9, charSize, charSize);
         ctx.restore();
 
-        // Golden soft border ring
-        ctx.strokeStyle = 'rgba(255, 220, 150, 0.8)';
-        ctx.lineWidth = 3.5;
+        // Golden perimeter border
+        ctx.strokeStyle = 'rgba(255, 215, 0, 0.85)';
+        ctx.lineWidth = 2.5;
         ctx.beginPath();
-        ctx.arc(mikoX + mikoSize * 0.5, mikoY + mikoSize * 0.5, mikoSize * 0.48, 0, Math.PI * 2);
+        ctx.arc(0, -charSize * 0.45, charSize * 0.45, 0, Math.PI * 2);
         ctx.stroke();
       } else {
         // Detailed Fallback Canvas Vector Character
-        ctx.translate(mikoX + mikoSize * 0.5, mikoY + mikoSize * 0.5);
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.3)';
+        ctx.shadowBlur = 6;
 
-        // Body base circle/clip
-        ctx.fillStyle = '#ff758f';
-        ctx.beginPath();
-        ctx.arc(0, 0, mikoSize * 0.45, 0, Math.PI * 2);
-        ctx.fill();
-
-        // White kimono top
+        // White Kimono Top
         ctx.fillStyle = '#ffffff';
         ctx.beginPath();
-        ctx.ellipse(0, mikoSize * 0.25, 28, 20, 0, 0, Math.PI * 2);
+        ctx.ellipse(0, -charSize * 0.32, 18, 14, 0, 0, Math.PI * 2);
         ctx.fill();
 
-        // Red Hakama dress
+        // Red Hakama Skirt
         ctx.fillStyle = '#d90429';
         ctx.beginPath();
-        ctx.moveTo(-25, mikoSize * 0.22);
-        ctx.lineTo(25, mikoSize * 0.22);
-        ctx.lineTo(32, mikoSize * 0.45);
-        ctx.lineTo(-32, mikoSize * 0.45);
+        ctx.moveTo(-16, -charSize * 0.32);
+        ctx.lineTo(16, -charSize * 0.32);
+        ctx.lineTo(22, -4);
+        ctx.lineTo(-22, -4);
         ctx.closePath();
         ctx.fill();
 
-        // Face
+        // Face & Head
         ctx.fillStyle = '#ffe5d9';
         ctx.beginPath();
-        ctx.arc(0, -mikoSize * 0.08, 26, 0, Math.PI * 2);
+        ctx.arc(0, -charSize * 0.62, 18, 0, Math.PI * 2);
         ctx.fill();
 
-        // Hair (Black twin pigtails & bangs)
+        // Black twin-tails & bangs
         ctx.fillStyle = '#211a21';
         ctx.beginPath();
-        ctx.arc(0, -mikoSize * 0.12, 28, Math.PI, Math.PI * 2);
-        ctx.arc(-18, -mikoSize * 0.04, 10, 0, Math.PI * 2);
-        ctx.arc(18, -mikoSize * 0.04, 10, 0, Math.PI * 2);
+        ctx.arc(0, -charSize * 0.65, 20, Math.PI, Math.PI * 2);
+        ctx.arc(-14, -charSize * 0.58, 7, 0, Math.PI * 2);
+        ctx.arc(14, -charSize * 0.58, 7, 0, Math.PI * 2);
         ctx.fill();
 
-        // Chibi Eyes
+        // Red Hair Ribbon
+        ctx.fillStyle = '#d90429';
+        ctx.fillRect(-12, -charSize * 0.82, 24, 6);
+
+        // Eyes & Cute Cheeks
         ctx.fillStyle = '#3a202c';
         ctx.beginPath();
-        ctx.arc(-9, -mikoSize * 0.08, 3.5, 0, Math.PI * 2);
-        ctx.arc(9, -mikoSize * 0.08, 3.5, 0, Math.PI * 2);
+        ctx.arc(-6, -charSize * 0.62, 2.5, 0, Math.PI * 2);
+        ctx.arc(6, -charSize * 0.62, 2.5, 0, Math.PI * 2);
         ctx.fill();
 
-        // Cheeks
-        ctx.fillStyle = 'rgba(255, 110, 140, 0.5)';
+        ctx.fillStyle = 'rgba(255, 110, 140, 0.55)';
         ctx.beginPath();
-        ctx.arc(-14, -mikoSize * 0.04, 4, 0, Math.PI * 2);
-        ctx.arc(14, -mikoSize * 0.04, 4, 0, Math.PI * 2);
+        ctx.arc(-9, -charSize * 0.56, 3, 0, Math.PI * 2);
+        ctx.arc(9, -charSize * 0.56, 3, 0, Math.PI * 2);
         ctx.fill();
 
         // Golden Kagura Suzur Bell in hand
-        ctx.fillStyle = '#f5c518';
+        ctx.fillStyle = '#ffd166';
         ctx.beginPath();
-        ctx.arc(22, 10, 7, 0, Math.PI * 2);
+        ctx.arc(14, -charSize * 0.3, 5, 0, Math.PI * 2);
         ctx.fill();
-        ctx.strokeStyle = '#9e7500';
-        ctx.lineWidth = 2;
-        ctx.stroke();
       }
+
       ctx.restore();
     }
 
-    // Draw Dynamic Radiant Slash Line
-    function drawSlashTrail() {
-      if (slashPoints.length < 2) return;
-      const now = performance.now();
-
-      ctx.save();
-      for (let i = 1; i < slashPoints.length; i++) {
-        const p1 = slashPoints[i - 1];
-        const p2 = slashPoints[i];
-        const age = (now - p2.time) / 160;
-        if (age >= 1) continue;
-
-        const alpha = 1 - age;
-        const widthVal = (1 - age) * 11;
-
-        // Outer holy spirit aura (light blue / magenta)
-        ctx.beginPath();
-        ctx.moveTo(p1.x, p1.y);
-        ctx.lineTo(p2.x, p2.y);
-        ctx.lineCap = 'round';
-        ctx.strokeStyle = `rgba(180, 240, 255, ${alpha * 0.6})`;
-        ctx.lineWidth = widthVal + 10;
-        ctx.stroke();
-
-        // Inner glowing sacred blade
-        ctx.beginPath();
-        ctx.moveTo(p1.x, p1.y);
-        ctx.lineTo(p2.x, p2.y);
-        ctx.strokeStyle = `rgba(255, 255, 255, ${alpha})`;
-        ctx.lineWidth = widthVal;
-        ctx.stroke();
-      }
-      ctx.restore();
-    }
-
-    // Draw Particles & Floating Labels
+    // Draw Particles & Floating Popups
     function drawParticles() {
       ctx.save();
+      ctx.translate(0, -cameraY);
+
       for (const p of particles) {
         ctx.fillStyle = p.color;
         ctx.globalAlpha = Math.max(0, p.life);
-
-        if (p.shape === 'star') {
-          // Draw small four-point star
-          ctx.save();
-          ctx.translate(p.x, p.y);
-          ctx.beginPath();
-          for (let i = 0; i < 4; i++) {
-            ctx.rotate(Math.PI / 2);
-            ctx.lineTo(p.size * 1.5, 0);
-            ctx.lineTo(0, p.size * 0.4);
-          }
-          ctx.closePath();
-          ctx.fill();
-          ctx.restore();
-        } else {
-          ctx.beginPath();
-          ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
-          ctx.fill();
-        }
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+        ctx.fill();
       }
       ctx.restore();
 
-      // Text Popups
+      // Screen-space Text popups
       ctx.save();
-      for (const tp of textPopups) {
-        ctx.globalAlpha = Math.max(0, tp.life);
+      for (const pop of popups) {
+        ctx.globalAlpha = Math.max(0, pop.life);
         ctx.font = 'bold 20px "Hiragino Kaku Gothic ProN", sans-serif';
         ctx.textAlign = 'center';
-        ctx.fillStyle = tp.color;
-        ctx.shadowColor = 'rgba(0, 0, 0, 0.8)';
+        ctx.fillStyle = pop.color;
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.7)';
         ctx.shadowBlur = 6;
-        ctx.fillText(tp.text, tp.x, tp.y);
+        ctx.fillText(pop.text, pop.x, pop.y);
       }
       ctx.restore();
     }
 
-    // Draw Top UI (Score, Combo, Heart Lives)
-    function drawUI() {
+    // Draw Top UI (Stairs Score, Timer Bar, Altitude Tag)
+    function drawPlayUI() {
       ctx.save();
-      // Upper banner background
-      const barGrad = ctx.createLinearGradient(0, 0, 0, 75);
-      barGrad.addColorStop(0, 'rgba(10, 4, 18, 0.85)');
-      barGrad.addColorStop(1, 'rgba(10, 4, 18, 0)');
+
+      // Upper Header Banner
+      const barGrad = ctx.createLinearGradient(0, 0, 0, 85);
+      barGrad.addColorStop(0, 'rgba(10, 15, 25, 0.85)');
+      barGrad.addColorStop(1, 'rgba(10, 15, 25, 0)');
       ctx.fillStyle = barGrad;
-      ctx.fillRect(0, 0, width, 75);
+      ctx.fillRect(0, 0, width, 85);
 
-      // Score
+      // Current Stairs Counter
       ctx.fillStyle = '#ffffff';
-      ctx.font = 'bold 15px sans-serif';
-      ctx.fillText('SCORE', 20, 28);
-      ctx.font = '900 28px sans-serif';
+      ctx.font = 'bold 13px sans-serif';
+      ctx.fillText('標高・段数', 20, 26);
+
       ctx.fillStyle = '#ffd166';
-      ctx.fillText(score.toLocaleString(), 20, 58);
+      ctx.font = '900 34px sans-serif';
+      ctx.fillText(`${score}`, 20, 60);
 
-      // Combo Pill
-      if (combo > 1) {
-        ctx.save();
-        ctx.translate(width / 2, 38);
-        ctx.fillStyle = 'rgba(6, 214, 160, 0.25)';
-        ctx.strokeStyle = '#06d6a0';
-        ctx.lineWidth = 1.5;
-        ctx.beginPath();
-        ctx.roundRect(-45, -16, 90, 32, 16);
-        ctx.fill();
-        ctx.stroke();
+      ctx.fillStyle = '#ffb3c6';
+      ctx.font = 'bold 16px sans-serif';
+      ctx.fillText('段', 25 + ctx.measureText(`${score}`).width + 6, 60);
 
-        ctx.fillStyle = '#06d6a0';
-        ctx.font = '900 16px sans-serif';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(`${combo} COMBO`, 0, 0);
-        ctx.restore();
+      // Elevation Tag
+      const zone = getElevationZone(score);
+      const zoneTitles = ['【参道】昼の清風', '【中腹】夕焼けの石段', '【高嶺】宵闇と満月', '【頂上】神域の天翔'];
+      ctx.textAlign = 'right';
+      ctx.fillStyle = '#a6b0c2';
+      ctx.font = 'bold 12px sans-serif';
+      ctx.fillText(zoneTitles[zone], width - 20, 26);
+
+      // Remaining Time Gauge Bar
+      const gaugeW = width - 40;
+      const gaugeH = 9;
+      const gaugeX = 20;
+      const gaugeY = 72;
+
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+      ctx.beginPath();
+      ctx.roundRect(gaugeX, gaugeY, gaugeW, gaugeH, 5);
+      ctx.fill();
+
+      // Fill ratio
+      const fillW = Math.max(0, (timer / MAX_TIME) * gaugeW);
+      const gaugeGrad = ctx.createLinearGradient(gaugeX, 0, gaugeX + gaugeW, 0);
+      if (timer > 40) {
+        gaugeGrad.addColorStop(0, '#06d6a0');
+        gaugeGrad.addColorStop(1, '#ffd166');
+      } else {
+        gaugeGrad.addColorStop(0, '#ff4d6d');
+        gaugeGrad.addColorStop(1, '#ff758f');
       }
 
-      // Life (Hearts)
-      const heartStartX = width - 28;
-      const heartSize = 16;
-      for (let i = 0; i < MAX_LIFE; i++) {
-        const hx = heartStartX - i * 28;
-        const hy = 38;
-        const filled = i < life;
+      ctx.fillStyle = gaugeGrad;
+      ctx.beginPath();
+      ctx.roundRect(gaugeX, gaugeY, fillW, gaugeH, 5);
+      ctx.fill();
 
-        ctx.save();
-        ctx.fillStyle = filled ? '#ff4d6d' : '#495057';
-        ctx.strokeStyle = '#ff758f';
-        ctx.lineWidth = 1.5;
+      // Bottom Touch Guide Arrows (Subtle for mobile accessibility)
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.18)';
+      ctx.font = 'bold 26px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('◀ 左 (A)', width * 0.25, height - 25);
+      ctx.fillText('右 (D) ▶', width * 0.75, height - 25);
 
-        // Heart shape
-        ctx.beginPath();
-        const topCurveHeight = heartSize * 0.3;
-        ctx.moveTo(hx, hy + topCurveHeight);
-        ctx.bezierCurveTo(hx, hy, hx - heartSize / 2, hy, hx - heartSize / 2, hy + topCurveHeight);
-        ctx.bezierCurveTo(hx - heartSize / 2, hy + (heartSize + topCurveHeight) / 2, hx, hy + heartSize, hx, hy + heartSize);
-        ctx.bezierCurveTo(hx, hy + heartSize, hx + heartSize / 2, hy + (heartSize + topCurveHeight) / 2, hx + heartSize / 2, hy + topCurveHeight);
-        ctx.bezierCurveTo(hx + heartSize / 2, hy, hx, hy, hx, hy + topCurveHeight);
-        ctx.closePath();
-        ctx.fill();
-        if (filled) ctx.stroke();
-        ctx.restore();
-      }
+      // Central divider dotted line
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.12)';
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([4, 6]);
+      ctx.beginPath();
+      ctx.moveTo(width / 2, height - 60);
+      ctx.lineTo(width / 2, height - 10);
+      ctx.stroke();
+      ctx.setLineDash([]);
 
       ctx.restore();
     }
 
-    // Draw Title Screen
+    // Draw Title Screen Overlay
     function drawTitleScreen() {
       ctx.save();
-      // Translucent wash
-      ctx.fillStyle = 'rgba(10, 4, 18, 0.72)';
+      ctx.fillStyle = 'rgba(10, 14, 28, 0.78)';
       ctx.fillRect(0, 0, width, height);
 
-      // Title Banner
       ctx.textAlign = 'center';
-      ctx.shadowColor = 'rgba(255, 120, 180, 0.7)';
+      ctx.shadowColor = 'rgba(255, 120, 180, 0.8)';
       ctx.shadowBlur = 20;
 
       ctx.fillStyle = '#ffd166';
-      ctx.font = 'bold 16px sans-serif';
-      ctx.fillText('〜 巫女の邪気退散アクション 〜', width / 2, height * 0.22);
+      ctx.font = 'bold 15px sans-serif';
+      ctx.fillText('〜 巫女の石段駆け上がりアタック 〜', width / 2, height * 0.22);
 
       ctx.fillStyle = '#ffffff';
-      ctx.font = '900 42px sans-serif';
-      ctx.fillText('お祓いスラッシュ', width / 2, height * 0.29);
+      ctx.font = '900 38px sans-serif';
+      ctx.fillText('神社の階段のぼり', width / 2, height * 0.29);
 
       // Rules Card
       ctx.shadowBlur = 0;
       const cardW = Math.min(width - 40, 360);
       const cardX = (width - cardW) / 2;
       const cardY = height * 0.35;
-      const cardH = 210;
+      const cardH = 220;
 
-      ctx.fillStyle = 'rgba(35, 18, 48, 0.85)';
-      ctx.strokeStyle = 'rgba(255, 200, 220, 0.4)';
+      ctx.fillStyle = 'rgba(26, 32, 58, 0.9)';
+      ctx.strokeStyle = 'rgba(255, 182, 193, 0.35)';
       ctx.lineWidth = 1.5;
       ctx.beginPath();
       ctx.roundRect(cardX, cardY, cardW, cardH, 18);
@@ -923,18 +1045,19 @@
 
       ctx.font = '14px sans-serif';
       ctx.fillStyle = '#e2e8f0';
-      ctx.fillText('⚡ 画面をスラッシュして「邪気」を一閃！', width / 2, cardY + 74);
-      ctx.fillText('🍡「お供え物（団子・林檎）」は斬っちゃダメ！', width / 2, cardY + 108);
-      ctx.fillText('🔔 邪気を逃すとお手付き（ライフ -1）', width / 2, cardY + 142);
-      ctx.fillText('🌸 連続でお祓いするとコンボボーナス！', width / 2, cardY + 176);
+      ctx.fillText('⛩️ 次の石段が「左」か「右」か見極めて前進！', width / 2, cardY + 72);
+      ctx.fillText('⏱️ 時間ゲージが尽きる前にテンポよく登ろう', width / 2, cardY + 104);
+      ctx.fillText('✨ 踏み外すと即座にゲームオーバー！', width / 2, cardY + 136);
+      ctx.fillText('🌸 勾玉で無敵ダッシュ、御守で時間全快', width / 2, cardY + 168);
+      ctx.fillText('💻 [← / →] キー / 📱 画面の左右タップ', width / 2, cardY + 200);
 
       // Start Button
-      const btnY = height * 0.72;
+      const btnY = height * 0.74;
       const btnGrad = ctx.createLinearGradient(width / 2 - 100, 0, width / 2 + 100, 0);
-      btnGrad.addColorStop(0, '#e63946');
+      btnGrad.addColorStop(0, '#d90429');
       btnGrad.addColorStop(1, '#ff758f');
 
-      ctx.shadowColor = 'rgba(230, 57, 70, 0.8)';
+      ctx.shadowColor = 'rgba(217, 4, 41, 0.7)';
       ctx.shadowBlur = 15;
       ctx.fillStyle = btnGrad;
       ctx.beginPath();
@@ -945,15 +1068,15 @@
       ctx.fillStyle = '#ffffff';
       ctx.font = 'bold 20px sans-serif';
       ctx.textBaseline = 'middle';
-      ctx.fillText('祓いを始める', width / 2, btnY);
+      ctx.fillText('石段を登る', width / 2, btnY);
 
       ctx.restore();
     }
 
-    // Draw Game Over Screen
+    // Draw Game Over Screen Overlay
     function drawGameOverScreen() {
       ctx.save();
-      ctx.fillStyle = 'rgba(10, 4, 18, 0.84)';
+      ctx.fillStyle = 'rgba(10, 14, 28, 0.86)';
       ctx.fillRect(0, 0, width, height);
 
       ctx.textAlign = 'center';
@@ -962,17 +1085,17 @@
 
       ctx.fillStyle = '#ff4d6d';
       ctx.font = '900 36px sans-serif';
-      ctx.fillText('お祓い失敗...', width / 2, height * 0.26);
+      ctx.fillText('足を滑らせた...', width / 2, height * 0.25);
 
-      // Result Box
+      // Result Card
       ctx.shadowBlur = 0;
       const cardW = Math.min(width - 40, 360);
       const cardX = (width - cardW) / 2;
-      const cardY = height * 0.33;
-      const cardH = 220;
+      const cardY = height * 0.32;
+      const cardH = 225;
 
-      ctx.fillStyle = 'rgba(35, 18, 48, 0.9)';
-      ctx.strokeStyle = 'rgba(255, 200, 220, 0.3)';
+      ctx.fillStyle = 'rgba(26, 32, 58, 0.92)';
+      ctx.strokeStyle = 'rgba(255, 182, 193, 0.3)';
       ctx.lineWidth = 1.5;
       ctx.beginPath();
       ctx.roundRect(cardX, cardY, cardW, cardH, 18);
@@ -980,25 +1103,26 @@
       ctx.stroke();
 
       ctx.fillStyle = '#adb5bd';
-      ctx.font = 'bold 15px sans-serif';
-      ctx.fillText('FINAL SCORE', width / 2, cardY + 45);
+      ctx.font = 'bold 14px sans-serif';
+      ctx.fillText('到達標高 (段数)', width / 2, cardY + 42);
 
       ctx.fillStyle = '#ffd166';
-      ctx.font = '900 40px sans-serif';
-      ctx.fillText(score.toLocaleString(), width / 2, cardY + 92);
+      ctx.font = '900 44px sans-serif';
+      ctx.fillText(`${score} 段`, width / 2, cardY + 92);
 
       ctx.fillStyle = '#06d6a0';
-      ctx.font = 'bold 18px sans-serif';
-      ctx.fillText(`最大連続コンボ: ${maxCombo} 回`, width / 2, cardY + 142);
+      ctx.font = 'bold 16px sans-serif';
+      ctx.fillText(`最高到達記録: ${highScore} 段`, width / 2, cardY + 138);
 
-      // Praise title by score
-      let rankText = '見習い巫女級';
-      if (score >= 5000) rankText = '神代の霊力巫女級 ✨';
-      else if (score >= 2500) rankText = '熟練の一級巫女級 🌸';
-      else if (score >= 1000) rankText = '頼れる本堂巫女級 🔔';
+      // Evaluation rank
+      let rank = '参道入り口級 (見習い巫女)';
+      if (score >= 100) rank = '神域天翔級 (神代の風速巫女) ✨';
+      else if (score >= 60) rank = '高嶺本殿級 (俊足の巫女長) 🌸';
+      else if (score >= 30) rank = '境内中腹級 (健脚巫女) 🔔';
+
       ctx.fillStyle = '#f8f9fa';
-      ctx.font = '15px sans-serif';
-      ctx.fillText(`社务所評価: ${rankText}`, width / 2, cardY + 182);
+      ctx.font = '14px sans-serif';
+      ctx.fillText(`神社番付: ${rank}`, width / 2, cardY + 182);
 
       // Retry Button
       const btnY = height * 0.76;
@@ -1017,38 +1141,30 @@
       ctx.fillStyle = '#ffffff';
       ctx.font = 'bold 20px sans-serif';
       ctx.textBaseline = 'middle';
-      ctx.fillText('もう一度祓う', width / 2, btnY);
+      ctx.fillText('もう一度登る', width / 2, btnY);
 
       ctx.restore();
     }
 
     // --- Main Game Loop ---
-    let lastTimestamp = performance.now();
+    let lastTime = performance.now();
     function gameLoop(timestamp) {
-      const dt = Math.min((timestamp - lastTimestamp) / 1000, 0.1);
-      lastTimestamp = timestamp;
+      const dt = Math.min((timestamp - lastTime) / 1000, 0.1);
+      lastTime = timestamp;
 
-      // Update
+      // Update Physics & Entities
       update(dt);
 
-      // Render
+      // Render Stage
       ctx.clearRect(0, 0, width, height);
-      drawBackground();
-
-      // Draw Entities
-      for (const obj of objects) {
-        if (obj.type === 'evil') drawEvilAura(obj);
-        else drawOffer(obj);
-      }
-
-      // Draw Miko Character, Slash trail & visual FX
-      drawMikoCharacter();
-      drawSlashTrail();
+      drawDynamicBackground();
+      drawStairs();
+      drawPlayer();
       drawParticles();
 
-      // UI / Overlays
+      // Draw UI Overlays
       if (currentState === STATE.PLAYING) {
-        drawUI();
+        drawPlayUI();
       } else if (currentState === STATE.TITLE) {
         drawTitleScreen();
       } else if (currentState === STATE.GAMEOVER) {
