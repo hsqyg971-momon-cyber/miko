@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>境内防衛・お札タワーディフェンス</title>
+  <title>おみくじルーレット・パズル</title>
   <style>
     * {
       margin: 0;
@@ -17,7 +17,7 @@
       width: 100%;
       height: 100%;
       overflow: hidden;
-      background: #0f121d;
+      background: #140d18;
       font-family: 'Hiragino Kaku Gothic ProN', 'Meiryo', sans-serif;
       color: #fff;
       display: flex;
@@ -28,10 +28,10 @@
       position: relative;
       width: 100%;
       height: 100%;
-      max-width: 500px;
-      max-height: 860px;
-      background: #19231f;
-      box-shadow: 0 0 35px rgba(255, 120, 160, 0.2);
+      max-width: 480px;
+      max-height: 850px;
+      background: #1c1322;
+      box-shadow: 0 0 35px rgba(255, 105, 180, 0.22);
       overflow: hidden;
       cursor: default;
     }
@@ -48,7 +48,7 @@
   </div>
 
   <script>
-    // --- Web Audio API Sound Synthesizer ---
+    // --- Web Audio API Synthesizer (No external sound files) ---
     const Sound = {
       ctx: null,
       init() {
@@ -60,110 +60,109 @@
           this.ctx.resume();
         }
       },
-      // Place Ofuda paper "Sa!"
-      playPlace() {
+      // Piece tap / select
+      playSelect() {
         if (!this.ctx) return;
         const now = this.ctx.currentTime;
         const osc = this.ctx.createOscillator();
         const gain = this.ctx.createGain();
-        osc.type = 'triangle';
-        osc.frequency.setValueAtTime(480, now);
-        osc.frequency.exponentialRampToValueAtTime(140, now + 0.08);
-        gain.gain.setValueAtTime(0.12, now);
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(587.33, now); // D5
+        osc.frequency.exponentialRampToValueAtTime(880, now + 0.06);
+        gain.gain.setValueAtTime(0.08, now);
         gain.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
         osc.connect(gain);
         gain.connect(this.ctx.destination);
         osc.start(now);
         osc.stop(now + 0.09);
       },
-      // Shoot projectile
-      playShoot(type = 0) {
+      // Match clear pop (pitch scales with combo count)
+      playClear(combo = 1) {
+        if (!this.ctx) return;
+        const now = this.ctx.currentTime;
+        const baseFreqs = [440, 523.25, 659.25, 783.99, 880, 1046.5];
+        const freq = baseFreqs[Math.min(combo - 1, baseFreqs.length - 1)];
+
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(freq, now);
+        osc.frequency.exponentialRampToValueAtTime(freq * 1.25, now + 0.12);
+        gain.gain.setValueAtTime(0.12, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.14);
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start(now);
+        osc.stop(now + 0.15);
+      },
+      // Roulette drumroll tick
+      playTick() {
         if (!this.ctx) return;
         const now = this.ctx.currentTime;
         const osc = this.ctx.createOscillator();
         const gain = this.ctx.createGain();
-        if (type === 2) {
-          // Fire explosion shot
-          osc.type = 'sawtooth';
-          osc.frequency.setValueAtTime(260, now);
-          osc.frequency.exponentialRampToValueAtTime(80, now + 0.16);
-          gain.gain.setValueAtTime(0.14, now);
-          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.16);
-        } else if (type === 1) {
-          // Slow pulse
-          osc.type = 'sine';
-          osc.frequency.setValueAtTime(880, now);
-          osc.frequency.exponentialRampToValueAtTime(440, now + 0.18);
-          gain.gain.setValueAtTime(0.08, now);
-          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
-        } else {
-          // Basic light arrow
-          osc.type = 'triangle';
-          osc.frequency.setValueAtTime(740, now);
-          osc.frequency.exponentialRampToValueAtTime(320, now + 0.1);
-          gain.gain.setValueAtTime(0.08, now);
-          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
-        }
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(987.77, now);
+        gain.gain.setValueAtTime(0.05, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.04);
         osc.connect(gain);
         gain.connect(this.ctx.destination);
         osc.start(now);
-        osc.stop(now + 0.2);
+        osc.stop(now + 0.05);
       },
-      // Defeat Yokai
-      playDefeat() {
-        if (!this.ctx) return;
-        const now = this.ctx.currentTime;
-        const freqs = [523.25, 659.25, 783.99];
-        freqs.forEach((f, i) => {
-          const osc = this.ctx.createOscillator();
-          const gain = this.ctx.createGain();
-          osc.type = 'sine';
-          osc.frequency.setValueAtTime(f, now + i * 0.03);
-          gain.gain.setValueAtTime(0.09 / (i + 1), now + i * 0.03);
-          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.25 + i * 0.04);
-          osc.connect(gain);
-          gain.connect(this.ctx.destination);
-          osc.start(now + i * 0.03);
-          osc.stop(now + 0.32);
-        });
-      },
-      // Miko Kagura Bell Active Skill
+      // Suzu Bell & Blessing Chime (for Daikichi / Omikuji win)
       playBell() {
         if (!this.ctx) return;
         const now = this.ctx.currentTime;
-        const bellNotes = [1046.5, 1318.51, 1567.98, 2093.0, 2637.02];
+        const bellNotes = [1046.5, 1318.51, 1567.98, 2093.0];
         bellNotes.forEach((freq, idx) => {
           const osc = this.ctx.createOscillator();
           const gain = this.ctx.createGain();
           osc.type = 'sine';
-          osc.frequency.setValueAtTime(freq, now + idx * 0.035);
-          gain.gain.setValueAtTime(0.12, now + idx * 0.035);
-          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.65 + idx * 0.05);
+          osc.frequency.setValueAtTime(freq, now + idx * 0.04);
+          gain.gain.setValueAtTime(0.12, now + idx * 0.04);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.6 + idx * 0.05);
           osc.connect(gain);
           gain.connect(this.ctx.destination);
-          osc.start(now + idx * 0.035);
-          osc.stop(now + 0.75);
+          osc.start(now + idx * 0.04);
+          osc.stop(now + 0.7);
         });
       },
-      // Barrier hit damage
-      playBarrierDamage() {
+      // Salt purification whoosh / evil block purge
+      playPurify() {
         if (!this.ctx) return;
         const now = this.ctx.currentTime;
         const osc = this.ctx.createOscillator();
         const gain = this.ctx.createGain();
-        osc.type = 'sawtooth';
-        osc.frequency.setValueAtTime(150, now);
-        osc.frequency.linearRampToValueAtTime(60, now + 0.24);
-        gain.gain.setValueAtTime(0.24, now);
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(350, now);
+        osc.frequency.exponentialRampToValueAtTime(1200, now + 0.22);
+        gain.gain.setValueAtTime(0.15, now);
         gain.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
         osc.connect(gain);
         gain.connect(this.ctx.destination);
         osc.start(now);
         osc.stop(now + 0.26);
+      },
+      // Kyo ominous rumble
+      playKyo() {
+        if (!this.ctx) return;
+        const now = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(200, now);
+        osc.frequency.linearRampToValueAtTime(80, now + 0.4);
+        gain.gain.setValueAtTime(0.18, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.45);
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start(now);
+        osc.stop(now + 0.46);
       }
     };
 
-    // --- Canvas & Responsive Configuration ---
+    // --- Canvas & Responsive Settings ---
     const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d');
     const container = document.getElementById('game-container');
@@ -172,115 +171,84 @@
     let height = 0;
     let scale = 1;
 
-    // Game States
-    const STATE = { TITLE: 0, PLAYING: 1, GAMEOVER: 2, CLEAR: 3 };
+    // States: TITLE, PLAY, ROULETTE, RESULT
+    const STATE = { TITLE: 0, PLAY: 1, ROULETTE: 2, RESULT: 3 };
     let currentState = STATE.TITLE;
 
-    // Character Image
+    // Character Image Setup
     const mikoImg = new Image();
     let isMikoLoaded = false;
     mikoImg.src = 'miko.png';
     mikoImg.onload = () => { isMikoLoaded = true; };
     mikoImg.onerror = () => { isMikoLoaded = false; };
 
-    // Core Game Data
-    const MAX_LIFE = 10;
-    let life = MAX_LIFE;
-    let faithPoints = 140;
-    let wave = 1;
-    const MAX_WAVE = 7;
-    let waveSpawning = false;
-    let spawnQueue = [];
-    let spawnTimer = 0;
-    let totalKills = 0;
-    let gameTimer = 0;
+    // Core Game Config & Grid Constants
+    const COLS = 6;
+    const ROWS = 6;
+    let board = [];
+    let boardX = 0;
+    let boardY = 0;
+    let tileSize = 0;
 
-    // Miko Active Skill: Kagura Suzu
-    const SKILL_COST = 60;
-    let skillCooldown = 0;
-    const SKILL_MAX_COOLDOWN = 180; // frames (~3s)
+    // Piece Types
+    // 0: 赤 (お札), 1: 青 (勾玉), 2: 黄 (鈴), 3: 緑 (絵馬), 4: 紫 (破魔矢), -1: 厄石 (岩ブロック)
+    const PIECE_TYPES = [
+      { id: 0, name: 'お札', color: '#ff4d6d', bg: '#ffe5ec', kanji: '祓' },
+      { id: 1, name: '勾玉', color: '#3a86ff', bg: '#e0fbfc', kanji: '勾' },
+      { id: 2, name: '金鈴', color: '#ffb703', bg: '#fefae0', kanji: '鈴' },
+      { id: 3, name: '絵馬', color: '#2a9d8f', bg: '#e8f5e9', kanji: '馬' },
+      { id: 4, name: '破魔矢', color: '#9d4edd', bg: '#f3e8ff', kanji: '矢' }
+    ];
 
-    // Visual feedback
+    // Stats
+    let score = 0;
+    let timeLeft = 60;
+    let timerInterval = 0;
+    let virtueGauge = 0; // 0 to 100 (徳ゲージ)
+    const MAX_VIRTUE = 100;
+    let comboChain = 0;
+    let feverTimer = 0; // Fever seconds remaining (score multiplier x3)
+    let omikujiHistory = []; // Recorded fortune results
+
+    // Selection & Cascading State
+    let selectedTile = null; // { r, c }
+    let isProcessing = false;
+
+    // Visuals & Effects
+    let particles = [];
+    let popups = [];
     let screenShake = 0;
     let screenFlash = 0;
 
-    // Shrine Path Points (Normalized Coordinates 0.0 - 1.0)
-    const normalizedWaypoints = [
-      { x: 0.16, y: 0.12 }, // Torii Entrance (Top Left)
-      { x: 0.82, y: 0.12 },
-      { x: 0.82, y: 0.36 },
-      { x: 0.18, y: 0.36 },
-      { x: 0.18, y: 0.62 },
-      { x: 0.80, y: 0.62 },
-      { x: 0.80, y: 0.82 },
-      { x: 0.50, y: 0.82 }  // Shrine Sanctuary Front (Miko)
-    ];
-
-    let waypoints = [];
-
-    // Tower Types Configuration
-    const TOWER_TYPES = [
-      {
-        id: 0,
-        name: '破邪のお札',
-        subName: '破邪',
-        cost: 45,
-        range: 105,
-        fireRate: 36, // frames per shot
-        damage: 18,
-        color: '#4cc9f0',
-        accent: '#ffffff',
-        desc: '単体に光弾を射出'
-      },
-      {
-        id: 1,
-        name: '減速のお札',
-        subName: '減速',
-        cost: 60,
-        range: 90,
-        fireRate: 50,
-        damage: 6,
-        slowRatio: 0.5,
-        slowDuration: 75,
-        color: '#b5179e',
-        accent: '#f72585',
-        desc: '周囲の敵を遅延'
-      },
-      {
-        id: 2,
-        name: '御神火のお札',
-        subName: '神火',
-        cost: 95,
-        range: 125,
-        fireRate: 70,
-        damage: 42,
-        splashRadius: 55,
-        color: '#ff5400',
-        accent: '#ffb703',
-        desc: '爆発し範囲攻撃'
-      }
-    ];
-
-    // Selected tower for building / selected tower on board
-    let selectedBuildIndex = 0; // default to Basic
-    let selectedTower = null; // clicked board tower
-
-    // Entities
-    let towers = [];
-    let enemies = [];
-    let projectiles = [];
-    let particles = [];
-    let popups = [];
-
-    // Miko animation
+    // Miko Animation Controller
     let mikoAnim = {
       jumpY: 0,
       jumpVy: 0,
-      bellEffectTimer: 0,
-      waveRings: []
+      shakeAngle: 0,
+      saltPurifying: false,
+      saltTimer: 0,
+      bellWaves: []
     };
 
-    // Resize Handler
+    // Omikuji Roulette Controller
+    const FORTUNES = [
+      { name: '大吉', color: '#e63946', weight: 22, desc: '同色全消去 ＆ 黄金フィーバー！' },
+      { name: '中吉', color: '#fb8500', weight: 28, desc: '十字結界レーザー一閃！' },
+      { name: '小吉', color: '#06d6a0', weight: 25, desc: '徳高まる ＋ ボーナス2000点！' },
+      { name: '末吉', color: '#4cc9f0', weight: 15, desc: '神風の祈祷 ＋ 残り時間延長！' },
+      { name: '凶',   color: '#7209b7', weight: 10, desc: '厄岩出現！巫女をタップでお清め！' }
+    ];
+    let roulette = {
+      active: false,
+      angle: 0,
+      speed: 0,
+      targetIndex: 0,
+      stopping: false,
+      timer: 0,
+      result: null
+    };
+
+    // --- Responsive Canvas Resizing ---
     function resizeCanvas() {
       const rect = container.getBoundingClientRect();
       width = rect.width;
@@ -289,150 +257,347 @@
       canvas.width = width * dpr;
       canvas.height = height * dpr;
       ctx.scale(dpr, dpr);
-      scale = width / 450;
+      scale = width / 440;
 
-      // Recalculate actual pixel waypoints
-      waypoints = normalizedWaypoints.map(p => ({
-        x: p.x * width,
-        y: p.y * height
-      }));
+      // Calculate Grid Layout
+      const padding = 16;
+      tileSize = Math.floor((width - padding * 2) / COLS);
+      boardX = (width - tileSize * COLS) / 2;
+      boardY = height - tileSize * ROWS - 24;
     }
     window.addEventListener('resize', resizeCanvas);
     window.addEventListener('load', () => {
       resizeCanvas();
+      initBoard();
       requestAnimationFrame(gameLoop);
     });
 
-    // Distance helper
-    function dist(x1, y1, x2, y2) {
-      return Math.hypot(x2 - x1, y2 - y1);
-    }
-
-    // Distance to path to avoid placing towers right on the road
-    function distPointToSegment(px, py, x1, y1, x2, y2) {
-      const l2 = (x2 - x1) ** 2 + (y2 - y1) ** 2;
-      if (l2 === 0) return dist(px, py, x1, y1);
-      let t = ((px - x1) * (x2 - x1) + (py - y1) * (y2 - y1)) / l2;
-      t = Math.max(0, Math.min(1, t));
-      return dist(px, py, x1 + t * (x2 - x1), y1 + t * (y2 - y1));
-    }
-
-    function isPointNearPath(x, y, threshold) {
-      for (let i = 0; i < waypoints.length - 1; i++) {
-        const d = distPointToSegment(x, y, waypoints[i].x, waypoints[i].y, waypoints[i + 1].x, waypoints[i + 1].y);
-        if (d < threshold) return true;
+    // --- Board & Match Algorithms ---
+    function initBoard() {
+      board = [];
+      for (let r = 0; r < ROWS; r++) {
+        board[r] = [];
+        for (let c = 0; c < COLS; c++) {
+          let type;
+          // Avoid 3-matches on initial spawn
+          do {
+            type = Math.floor(Math.random() * PIECE_TYPES.length);
+          } while (
+            (c >= 2 && board[r][c - 1]?.type === type && board[r][c - 2]?.type === type) ||
+            (r >= 2 && board[r - 1][c]?.type === type && board[r - 2][c]?.type === type)
+          );
+          board[r][c] = {
+            type,
+            animY: 0,
+            scale: 1,
+            fade: 1,
+            isRemoving: false
+          };
+        }
       }
-      return false;
     }
 
-    // --- Game Cycle & Waves ---
+    // Check Matches across board
+    function findMatches() {
+      const matched = Array.from({ length: ROWS }, () => Array(COLS).fill(false));
+      let hasMatch = false;
+
+      // Horizontal check
+      for (let r = 0; r < ROWS; r++) {
+        for (let c = 0; c < COLS - 2; c++) {
+          const t = board[r][c]?.type;
+          if (t !== undefined && t >= 0 && t === board[r][c + 1]?.type && t === board[r][c + 2]?.type) {
+            matched[r][c] = true;
+            matched[r][c + 1] = true;
+            matched[r][c + 2] = true;
+            hasMatch = true;
+          }
+        }
+      }
+
+      // Vertical check
+      for (let c = 0; c < COLS; c++) {
+        for (let r = 0; r < ROWS - 2; r++) {
+          const t = board[r][c]?.type;
+          if (t !== undefined && t >= 0 && t === board[r + 1][c]?.type && t === board[r + 2][c]?.type) {
+            matched[r][c] = true;
+            matched[r + 1][c] = true;
+            matched[r + 2][c] = true;
+            hasMatch = true;
+          }
+        }
+      }
+
+      return { hasMatch, matched };
+    }
+
+    // Swap Two Tiles
+    function swapTiles(r1, c1, r2, c2, callback) {
+      const temp = board[r1][c1];
+      board[r1][c1] = board[r2][c2];
+      board[r2][c2] = temp;
+      if (callback) callback();
+    }
+
+    // Cascade & Drop Falling Pieces
+    function applyGravityAndRefill() {
+      let moved = false;
+      for (let c = 0; c < COLS; c++) {
+        let emptyRow = ROWS - 1;
+        for (let r = ROWS - 1; r >= 0; r--) {
+          if (board[r][c] !== null) {
+            if (emptyRow !== r) {
+              board[emptyRow][c] = board[r][c];
+              board[emptyRow][c].animY = -(emptyRow - r) * tileSize;
+              board[r][c] = null;
+              moved = true;
+            }
+            emptyRow--;
+          }
+        }
+        // Refill empty tops
+        for (let r = emptyRow; r >= 0; r--) {
+          const type = Math.floor(Math.random() * PIECE_TYPES.length);
+          board[r][c] = {
+            type,
+            animY: -(r + 1.5) * tileSize,
+            scale: 1,
+            fade: 1,
+            isRemoving: false
+          };
+          moved = true;
+        }
+      }
+      return moved;
+    }
+
+    // Process Matches, Cascades & Combos
+    function resolveBoardMatches() {
+      const { hasMatch, matched } = findMatches();
+      if (!hasMatch) {
+        isProcessing = false;
+        comboChain = 0;
+        return;
+      }
+
+      comboChain++;
+      Sound.playClear(comboChain);
+
+      // Miko Cheer Animation
+      mikoAnim.jumpVy = -5.5;
+
+      let matchCount = 0;
+      for (let r = 0; r < ROWS; r++) {
+        for (let c = 0; c < COLS; c++) {
+          if (matched[r][c] && board[r][c]) {
+            matchCount++;
+            const px = boardX + c * tileSize + tileSize / 2;
+            const py = boardY + r * tileSize + tileSize / 2;
+            const pieceColor = PIECE_TYPES[board[r][c].type]?.color || '#ffd166';
+            addParticles(px, py, pieceColor, 8);
+            board[r][c] = null;
+          }
+        }
+      }
+
+      // Score and Virtue Gain
+      const feverMult = feverTimer > 0 ? 3 : 1;
+      const gainedScore = matchCount * 120 * comboChain * feverMult;
+      score += gainedScore;
+      addPopup(`+${gainedScore}`, width / 2, boardY - 14, feverMult > 1 ? '#ffd166' : '#a8dadc');
+
+      // Increase Virtue Gauge
+      virtueGauge = Math.min(MAX_VIRTUE, virtueGauge + matchCount * 3.8);
+
+      // Check if Virtue Gauge is full -> trigger Omikuji
+      if (virtueGauge >= MAX_VIRTUE && !roulette.active) {
+        virtueGauge = 0;
+        setTimeout(() => { triggerRoulette(); }, 350);
+      }
+
+      // Animate Cascade
+      setTimeout(() => {
+        applyGravityAndRefill();
+        setTimeout(() => {
+          resolveBoardMatches();
+        }, 220);
+      }, 160);
+    }
+
+    // Start Game Cycle
     function startGame() {
-      life = MAX_LIFE;
-      faithPoints = 135;
-      wave = 1;
-      totalKills = 0;
-      towers = [];
-      enemies = [];
-      projectiles = [];
+      score = 0;
+      timeLeft = 60;
+      virtueGauge = 20;
+      comboChain = 0;
+      feverTimer = 0;
+      omikujiHistory = [];
       particles = [];
       popups = [];
-      selectedTower = null;
-      skillCooldown = 0;
-      mikoAnim.jumpY = 0;
-      mikoAnim.jumpVy = 0;
-      mikoAnim.waveRings = [];
+      roulette.active = false;
+      mikoAnim.saltPurifying = false;
+      initBoard();
+      currentState = STATE.PLAY;
 
-      startWave(wave);
-      currentState = STATE.PLAYING;
-    }
-
-    function startWave(waveNum) {
-      waveSpawning = true;
-      spawnQueue = [];
-      spawnTimer = 0;
-
-      // Wave Enemy Compostion
-      // Type 0: 小鬼 (Fast, squishy)
-      // Type 1: からかさ (Normal)
-      // Type 2: 大入道 (Tanky boss)
-      const count = 7 + waveNum * 4;
-      for (let i = 0; i < count; i++) {
-        let type = 0;
-        const r = Math.random();
-        if (waveNum >= 4 && (i === count - 1 || (waveNum >= 6 && i === Math.floor(count / 2)))) {
-          type = 2; // 大入道
-        } else if (waveNum >= 2 && r > 0.45) {
-          type = 1; // からかさ小僧
-        } else {
-          type = 0; // 小鬼
+      clearInterval(timerInterval);
+      timerInterval = setInterval(() => {
+        if (currentState === STATE.PLAY) {
+          timeLeft--;
+          if (feverTimer > 0) feverTimer--;
+          if (timeLeft <= 0) {
+            timeLeft = 0;
+            clearInterval(timerInterval);
+            currentState = STATE.RESULT;
+            Sound.playBell();
+          }
         }
-        spawnQueue.push(type);
+      }, 1000);
+    }
+
+    // --- Omikuji Roulette Logic ---
+    function triggerRoulette() {
+      if (roulette.active) return;
+      roulette.active = true;
+      currentState = STATE.ROULETTE;
+      roulette.angle = 0;
+      roulette.speed = 0.45;
+      roulette.stopping = false;
+      roulette.timer = 0;
+      roulette.result = null;
+
+      // Pick weighted fortune outcome
+      const totalWeight = FORTUNES.reduce((sum, f) => sum + f.weight, 0);
+      let rand = Math.random() * totalWeight;
+      let chosenIdx = 0;
+      for (let i = 0; i < FORTUNES.length; i++) {
+        if (rand < FORTUNES[i].weight) {
+          chosenIdx = i;
+          break;
+        }
+        rand -= FORTUNES[i].weight;
+      }
+      roulette.targetIndex = chosenIdx;
+
+      // Miko Suzu ringing agitation
+      Sound.playBell();
+      mikoAnim.shakeAngle = 0.3;
+    }
+
+    function applyRouletteEffect(fortune) {
+      omikujiHistory.push(fortune.name);
+
+      if (fortune.name === '大吉') {
+        // Clear all random color pieces + start golden fever
+        Sound.playBell();
+        screenFlash = 0.4;
+        feverTimer = 15;
+        score += 3000;
+        addPopup('大吉！黄金フィーバー突入！', width / 2, height * 0.45, '#ffd166');
+
+        // Clear most common piece on board
+        const counts = [0, 0, 0, 0, 0];
+        for (let r = 0; r < ROWS; r++) {
+          for (let c = 0; c < COLS; c++) {
+            if (board[r][c]?.type >= 0) counts[board[r][c].type]++;
+          }
+        }
+        const maxType = counts.indexOf(Math.max(...counts));
+        for (let r = 0; r < ROWS; r++) {
+          for (let c = 0; c < COLS; c++) {
+            if (board[r][c]?.type === maxType) {
+              const px = boardX + c * tileSize + tileSize / 2;
+              const py = boardY + r * tileSize + tileSize / 2;
+              addParticles(px, py, '#ffd166', 10);
+              board[r][c] = null;
+            }
+          }
+        }
+        setTimeout(() => { applyGravityAndRefill(); resolveBoardMatches(); }, 300);
+
+      } else if (fortune.name === '中吉') {
+        // Cross Laser Barrier Purge (center row & col)
+        Sound.playBell();
+        score += 2000;
+        addPopup('中吉！十字破邪レーザー！', width / 2, height * 0.45, '#fb8500');
+        const midR = Math.floor(ROWS / 2);
+        const midC = Math.floor(COLS / 2);
+        for (let c = 0; c < COLS; c++) {
+          addParticles(boardX + c * tileSize + tileSize / 2, boardY + midR * tileSize + tileSize / 2, '#fb8500', 8);
+          board[midR][c] = null;
+        }
+        for (let r = 0; r < ROWS; r++) {
+          addParticles(boardX + midC * tileSize + tileSize / 2, boardY + r * tileSize + tileSize / 2, '#fb8500', 8);
+          board[r][midC] = null;
+        }
+        setTimeout(() => { applyGravityAndRefill(); resolveBoardMatches(); }, 300);
+
+      } else if (fortune.name === '小吉') {
+        Sound.playClear(4);
+        score += 1500;
+        virtueGauge = 40;
+        addPopup('小吉！徳ゲージ＋40％！', width / 2, height * 0.45, '#06d6a0');
+
+      } else if (fortune.name === '末吉') {
+        Sound.playClear(3);
+        timeLeft += 10;
+        score += 800;
+        addPopup('末吉！制限時間＋10秒！', width / 2, height * 0.45, '#4cc9f0');
+
+      } else if (fortune.name === '凶') {
+        // Turn 3 random tiles into Evil Rock obstacles
+        Sound.playKyo();
+        screenShake = 12;
+        addPopup('凶！厄石出現！巫女をタップでお清め！', width / 2, height * 0.45, '#7209b7');
+        let count = 0;
+        for (let i = 0; i < 20 && count < 3; i++) {
+          const rr = Math.floor(Math.random() * ROWS);
+          const rc = Math.floor(Math.random() * COLS);
+          if (board[rr][rc] && board[rr][rc].type >= 0) {
+            board[rr][rc].type = -1; // Rock
+            addParticles(boardX + rc * tileSize + tileSize / 2, boardY + rr * tileSize + tileSize / 2, '#4a4e69', 8);
+            count++;
+          }
+        }
       }
     }
 
-    function spawnEnemy(type) {
-      let hp = 45;
-      let spd = 1.35;
-      let radius = 14 * scale;
-      let reward = 12;
-      let name = '小鬼';
+    // Miko Purifying Salt Action (Tapping Miko clears rock obstacles with bonus)
+    function triggerMikoPurification() {
+      let rockCount = 0;
+      for (let r = 0; r < ROWS; r++) {
+        for (let c = 0; c < COLS; c++) {
+          if (board[r][c]?.type === -1) {
+            rockCount++;
+            const px = boardX + c * tileSize + tileSize / 2;
+            const py = boardY + r * tileSize + tileSize / 2;
+            addParticles(px, py, '#ffffff', 16, 1.4);
+            board[r][c] = null;
+          }
+        }
+      }
 
-      if (type === 1) {
-        // からかさ小僧
-        hp = 110 + wave * 22;
-        spd = 0.95;
-        radius = 16 * scale;
-        reward = 18;
-        name = 'からかさ';
-      } else if (type === 2) {
-        // 大入道
-        hp = 360 + wave * 90;
-        spd = 0.52;
-        radius = 24 * scale;
-        reward = 48;
-        name = '大入道';
+      if (rockCount > 0) {
+        Sound.playPurify();
+        mikoAnim.saltPurifying = true;
+        mikoAnim.saltTimer = 35;
+        mikoAnim.jumpVy = -6;
+        const reward = rockCount * 1200;
+        score += reward;
+        addPopup(`お清めの塩！ 厄落とし +${reward}`, width / 2, height * 0.38, '#ffffff');
+        setTimeout(() => { applyGravityAndRefill(); resolveBoardMatches(); }, 300);
       } else {
-        // 小鬼
-        hp = 50 + wave * 14;
-        spd = 1.4 + Math.random() * 0.2;
-        radius = 13 * scale;
-        reward = 12;
+        // Fun prayer bell chime
+        Sound.playBell();
+        mikoAnim.jumpVy = -4.5;
+        addPopup('神楽鈴の祈り♪', width / 2, height * 0.38, '#ffd166');
       }
-
-      enemies.push({
-        type,
-        name,
-        x: waypoints[0].x,
-        y: waypoints[0].y,
-        currentWp: 0,
-        distAlongCurrent: 0,
-        hp,
-        maxHp: hp,
-        spd,
-        baseSpd: spd,
-        slowTimer: 0,
-        radius,
-        reward,
-        wobble: Math.random() * 10
-      });
     }
 
-    function addPopup(text, x, y, color = '#ffd166') {
-      popups.push({
-        text,
-        x,
-        y,
-        color,
-        vy: -1.2,
-        life: 1,
-        decay: 0.025
-      });
-    }
-
+    // --- Particle & Popup Helpers ---
     function addParticles(x, y, color, count = 10, speedMult = 1) {
       for (let i = 0; i < count; i++) {
         const ang = Math.random() * Math.PI * 2;
-        const spd = (1 + Math.random() * 3) * speedMult;
+        const spd = (1 + Math.random() * 3.5) * speedMult;
         particles.push({
           x,
           y,
@@ -441,63 +606,28 @@
           size: 2.5 + Math.random() * 3.5,
           color,
           life: 1,
-          decay: 0.03 + Math.random() * 0.03
+          decay: 0.03 + Math.random() * 0.025
         });
       }
     }
 
-    // Miko Shrine Touch Action Skill: 神楽鈴の浄化
-    function triggerMikoSkill() {
-      if (faithPoints < SKILL_COST) {
-        addPopup('信仰不足！', width * 0.5, height * 0.74, '#ff4d6d');
-        Sound.playBarrierDamage();
-        return;
-      }
-      if (skillCooldown > 0) return;
-
-      faithPoints -= SKILL_COST;
-      skillCooldown = SKILL_MAX_COOLDOWN;
-      Sound.playBell();
-
-      // Miko bounce animation
-      mikoAnim.jumpVy = -6.5;
-      mikoAnim.bellEffectTimer = 35;
-
-      const mikoPos = getMikoPosition();
-      mikoAnim.waveRings.push({
-        x: mikoPos.x,
-        y: mikoPos.y,
-        radius: 10,
-        maxRadius: Math.max(width, height) * 0.9,
-        life: 1
+    function addPopup(text, x, y, color = '#ffd166') {
+      popups.push({
+        text,
+        x,
+        y,
+        color,
+        vy: -1.3,
+        life: 1,
+        decay: 0.02
       });
-
-      // Hit & slow all active yokai
-      let hitCount = 0;
-      enemies.forEach(e => {
-        e.hp -= 22;
-        e.slowTimer = 130; // ~2.2s stun/slow
-        addParticles(e.x, e.y, '#ffd166', 8);
-        hitCount++;
-      });
-
-      screenFlash = 0.28;
-      addPopup('神楽鈴の祈祷発動！', width * 0.5, height * 0.68, '#ffd166');
     }
 
-    // --- Inputs Handling (Mouse & Touch) ---
+    // --- Input Handling ---
     function handlePointerDown(px, py) {
       Sound.init();
 
       if (currentState === STATE.TITLE) {
-        const btnY = height * 0.74;
-        if (Math.abs(px - width / 2) < 110 && Math.abs(py - btnY) < 32) {
-          startGame();
-        }
-        return;
-      }
-
-      if (currentState === STATE.GAMEOVER || currentState === STATE.CLEAR) {
         const btnY = height * 0.76;
         if (Math.abs(px - width / 2) < 110 && Math.abs(py - btnY) < 32) {
           startGame();
@@ -505,140 +635,88 @@
         return;
       }
 
-      // --- Playing State Taps ---
-      // 1. Check if clicked Miko Guardian avatar
-      const mikoPos = getMikoPosition();
-      if (dist(px, py, mikoPos.x, mikoPos.y - 25 * scale) < 48 * scale) {
-        triggerMikoSkill();
-        return;
-      }
-
-      // 2. Check if clicked bottom HUD Tower Selector Buttons
-      const hudY = height - 76;
-      if (py > hudY) {
-        const btnW = (width - 32) / 3;
-        for (let i = 0; i < 3; i++) {
-          const bx = 16 + i * btnW;
-          if (px >= bx && px <= bx + btnW - 8 && py >= hudY + 4 && py <= hudY + 68) {
-            selectedBuildIndex = i;
-            selectedTower = null; // deselect active tower
-            Sound.playPlace();
-            return;
-          }
+      if (currentState === STATE.RESULT) {
+        const btnY = height * 0.78;
+        if (Math.abs(px - width / 2) < 110 && Math.abs(py - btnY) < 32) {
+          startGame();
         }
         return;
       }
 
-      // 3. Check if clicked existing tower sub-menu buttons (Upgrade / Sell)
-      if (selectedTower) {
-        const menuY = selectedTower.y - 54 * scale;
-        // Upgrade button
-        if (dist(px, py, selectedTower.x - 36 * scale, menuY) < 22 * scale) {
-          upgradeTower(selectedTower);
-          return;
+      if (currentState === STATE.ROULETTE) {
+        // Can tap anywhere on roulette to stop
+        if (!roulette.stopping) {
+          roulette.stopping = true;
+          roulette.speed = 0.25;
         }
-        // Sell button
-        if (dist(px, py, selectedTower.x + 36 * scale, menuY) < 22 * scale) {
-          sellTower(selectedTower);
-          return;
-        }
-        // Close menu if clicked outside
-        if (dist(px, py, selectedTower.x, selectedTower.y) > 42 * scale) {
-          selectedTower = null;
-        }
+        return;
       }
 
-      // 4. Check if tapped an existing placed tower to select it
-      for (const t of towers) {
-        if (dist(px, py, t.x, t.y) < t.radius + 10) {
-          selectedTower = t;
-          Sound.playPlace();
-          return;
-        }
+      // Tap Miko Shrine Avatar to trigger Salt Purification
+      const mikoCenter = getMikoPosition();
+      if (Math.hypot(px - mikoCenter.x, py - mikoCenter.y) < 55 * scale) {
+        triggerMikoPurification();
+        return;
       }
 
-      // 5. Try placing new tower on valid ground
-      // Bounds check: must be inside playable map and not on HUD or top bar
-      if (py > 70 && py < height - 90) {
-        const pathSafeDistance = 34 * scale;
-        if (isPointNearPath(px, py, pathSafeDistance)) {
-          addPopup('参道の上には置けません', px, py - 10, '#ff758f');
-          return;
-        }
+      // Playing State: Tap Grid Tiles
+      if (currentState === STATE.PLAY && !isProcessing) {
+        const col = Math.floor((px - boardX) / tileSize);
+        const row = Math.floor((py - boardY) / tileSize);
 
-        // Cannot place too close to Miko / Sanctuary
-        if (dist(px, py, mikoPos.x, mikoPos.y) < 55 * scale) {
-          addPopup('本殿前は神域です', px, py - 10, '#ff758f');
-          return;
-        }
-
-        // Cannot place overlapping another tower
-        for (const t of towers) {
-          if (dist(px, py, t.x, t.y) < 36 * scale) {
-            addPopup('間隔が狭すぎます', px, py - 10, '#ff758f');
+        if (col >= 0 && col < COLS && row >= 0 && row < ROWS) {
+          const clickedPiece = board[row][col];
+          if (!clickedPiece || clickedPiece.type === -1) {
+            // Tapping an evil rock prompts miko advice
+            if (clickedPiece?.type === -1) {
+              addPopup('上の巫女をタップしてお清め！', px, py - 16, '#ffd166');
+            }
+            selectedTile = null;
             return;
           }
-        }
 
-        // Place new tower
-        const cfg = TOWER_TYPES[selectedBuildIndex];
-        if (faithPoints >= cfg.cost) {
-          faithPoints -= cfg.cost;
-          towers.push({
-            type: cfg.id,
-            name: cfg.name,
-            subName: cfg.subName,
-            x: px,
-            y: py,
-            level: 1,
-            range: cfg.range * scale,
-            fireRate: cfg.fireRate,
-            cooldown: 0,
-            damage: cfg.damage,
-            radius: 17 * scale,
-            totalInvested: cfg.cost
-          });
-          Sound.playPlace();
-          addParticles(px, py, cfg.color, 12);
-          addPopup(`-${cfg.cost} 信仰`, px, py - 18, '#70d6ff');
+          if (!selectedTile) {
+            // First select
+            selectedTile = { r: row, c: col };
+            Sound.playSelect();
+          } else {
+            // Check if adjacent
+            const dr = Math.abs(selectedTile.r - row);
+            const dc = Math.abs(selectedTile.c - col);
+
+            if ((dr === 1 && dc === 0) || (dr === 0 && dc === 1)) {
+              isProcessing = true;
+              const r1 = selectedTile.r, c1 = selectedTile.c;
+              const r2 = row, c2 = col;
+              selectedTile = null;
+
+              // Swap and verify
+              swapTiles(r1, c1, r2, c2, () => {
+                const { hasMatch } = findMatches();
+                if (hasMatch) {
+                  resolveBoardMatches();
+                } else {
+                  // Revert swap if no match formed
+                  Sound.playTick();
+                  setTimeout(() => {
+                    swapTiles(r1, c1, r2, c2, () => {
+                      isProcessing = false;
+                    });
+                  }, 200);
+                }
+              });
+            } else {
+              // Select another tile
+              selectedTile = { r: row, c: col };
+              Sound.playSelect();
+            }
+          }
         } else {
-          addPopup('信仰ポイントが足りません！', px, py - 10, '#ff4d6d');
+          selectedTile = null;
         }
       }
     }
 
-    function upgradeTower(t) {
-      const upgradeCost = Math.floor(t.totalInvested * 0.75);
-      if (t.level >= 3) {
-        addPopup('最大強化済み！', t.x, t.y - 50, '#ffd166');
-        return;
-      }
-      if (faithPoints >= upgradeCost) {
-        faithPoints -= upgradeCost;
-        t.totalInvested += upgradeCost;
-        t.level++;
-        t.damage = Math.floor(t.damage * 1.6);
-        t.range *= 1.15;
-        t.fireRate = Math.max(18, Math.floor(t.fireRate * 0.85));
-        Sound.playBell();
-        addParticles(t.x, t.y, '#ffd166', 15, 1.3);
-        addPopup(`昇格 弐之型！ -${upgradeCost}`, t.x, t.y - 20, '#06d6a0');
-      } else {
-        addPopup(`強化不足 (要${upgradeCost})`, t.x, t.y - 50, '#ff4d6d');
-      }
-    }
-
-    function sellTower(t) {
-      const refund = Math.floor(t.totalInvested * 0.65);
-      faithPoints += refund;
-      towers = towers.filter(item => item !== t);
-      selectedTower = null;
-      Sound.playPlace();
-      addParticles(t.x, t.y, '#a8dadc', 10);
-      addPopup(`撤去 +${refund} 信仰`, t.x, t.y - 18, '#a8dadc');
-    }
-
-    // Attach Input Event Listeners
     canvas.addEventListener('mousedown', (e) => {
       const r = canvas.getBoundingClientRect();
       handlePointerDown(e.clientX - r.left, e.clientY - r.top);
@@ -651,227 +729,69 @@
       handlePointerDown(t.clientX - r.left, t.clientY - r.top);
     }, { passive: false });
 
-    // Miko Sanctum Position
     function getMikoPosition() {
       return {
-        x: waypoints[waypoints.length - 1].x,
-        y: waypoints[waypoints.length - 1].y + 18 * scale
+        x: width * 0.22,
+        y: height * 0.17
       };
     }
 
-    // --- Main Update Loop ---
+    // --- Update Loops ---
     function update() {
-      gameTimer++;
-
-      if (screenShake > 0) screenShake *= 0.86;
+      if (screenShake > 0) screenShake *= 0.88;
       if (screenShake < 0.2) screenShake = 0;
-      if (screenFlash > 0) screenFlash -= 0.04;
-      if (skillCooldown > 0) skillCooldown--;
+      if (screenFlash > 0) screenFlash -= 0.035;
 
-      // Miko bounce
+      // Miko Jump Dynamics
       mikoAnim.jumpY += mikoAnim.jumpVy;
-      mikoAnim.jumpVy += 0.55;
+      mikoAnim.jumpVy += 0.5;
       if (mikoAnim.jumpY >= 0) {
         mikoAnim.jumpY = 0;
         mikoAnim.jumpVy = 0;
       }
-      if (mikoAnim.bellEffectTimer > 0) mikoAnim.bellEffectTimer--;
-
-      // Miko sound wave rings
-      for (let i = mikoAnim.waveRings.length - 1; i >= 0; i--) {
-        const ring = mikoAnim.waveRings[i];
-        ring.radius += 8;
-        ring.life -= 0.025;
-        if (ring.life <= 0 || ring.radius > ring.maxRadius) {
-          mikoAnim.waveRings.splice(i, 1);
-        }
+      if (mikoAnim.shakeAngle > 0) {
+        mikoAnim.shakeAngle -= 0.015;
+        if (mikoAnim.shakeAngle < 0) mikoAnim.shakeAngle = 0;
       }
+      if (mikoAnim.saltTimer > 0) mikoAnim.saltTimer--;
 
-      if (currentState !== STATE.PLAYING) return;
-
-      // Natural Faith Point Regen
-      if (gameTimer % 45 === 0) {
-        faithPoints += 1;
-      }
-
-      // Wave Spawning Controller
-      if (waveSpawning) {
-        spawnTimer++;
-        if (spawnTimer >= 48) {
-          spawnTimer = 0;
-          if (spawnQueue.length > 0) {
-            const nextType = spawnQueue.shift();
-            spawnEnemy(nextType);
-          } else {
-            waveSpawning = false;
-          }
-        }
-      } else {
-        // If all enemies defeated in current wave
-        if (enemies.length === 0) {
-          if (wave < MAX_WAVE) {
-            wave++;
-            faithPoints += 45 + wave * 10;
-            addPopup(`WAVE ${wave} 到来！ (+信仰ボーナス)`, width / 2, height * 0.35, '#ffd166');
-            Sound.playBell();
-            startWave(wave);
-          } else {
-            // Cleared all waves!
-            currentState = STATE.CLEAR;
+      // Tile animation smoothing
+      for (let r = 0; r < ROWS; r++) {
+        for (let c = 0; c < COLS; c++) {
+          const piece = board[r][c];
+          if (piece && piece.animY < 0) {
+            piece.animY += 12;
+            if (piece.animY > 0) piece.animY = 0;
           }
         }
       }
 
-      // Update Enemies
-      for (let i = enemies.length - 1; i >= 0; i--) {
-        const e = enemies[i];
-
-        // Status effects
-        let actualSpd = e.baseSpd;
-        if (e.slowTimer > 0) {
-          e.slowTimer--;
-          actualSpd *= 0.45;
-        }
-
-        const targetWp = waypoints[e.currentWp + 1];
-        if (targetWp) {
-          const dx = targetWp.x - e.x;
-          const dy = targetWp.y - e.y;
-          const distance = Math.hypot(dx, dy);
-
-          if (distance <= actualSpd) {
-            e.x = targetWp.x;
-            e.y = targetWp.y;
-            e.currentWp++;
-
-            // Reached Sanctuary (Goal)
-            if (e.currentWp >= waypoints.length - 1) {
-              enemies.splice(i, 1);
-              life--;
-              screenShake = 16;
-              screenFlash = 0.4;
-              Sound.playBarrierDamage();
-              addPopup('本殿結界が被弾！ -1', width * 0.5, height * 0.72, '#ff4d6d');
-
-              if (life <= 0) {
-                life = 0;
-                currentState = STATE.GAMEOVER;
-              }
-              continue;
-            }
-          } else {
-            e.x += (dx / distance) * actualSpd;
-            e.y += (dy / distance) * actualSpd;
+      // Roulette Physics
+      if (roulette.active) {
+        roulette.angle += roulette.speed;
+        if (!roulette.stopping) {
+          roulette.timer++;
+          if (roulette.timer > 90) {
+            roulette.stopping = true;
           }
-        }
-
-        // Check Death
-        if (e.hp <= 0) {
-          totalKills++;
-          faithPoints += e.reward;
-          Sound.playDefeat();
-          addParticles(e.x, e.y, '#ffd166', 14);
-          addPopup(`+${e.reward}`, e.x, e.y - 12, '#ffd166');
-          enemies.splice(i, 1);
-        }
-      }
-
-      // Update Towers (Targeting & Attack)
-      for (const t of towers) {
-        if (t.cooldown > 0) t.cooldown--;
-
-        if (t.cooldown <= 0 && enemies.length > 0) {
-          // Find first enemy within range (priority to closest to shrine)
-          let target = null;
-          let maxProgress = -1;
-
-          for (const e of enemies) {
-            const d = dist(t.x, t.y, e.x, e.y);
-            if (d <= t.range) {
-              const progress = e.currentWp * 1000 + dist(waypoints[0].x, waypoints[0].y, e.x, e.y);
-              if (progress > maxProgress) {
-                maxProgress = progress;
-                target = e;
-              }
-            }
-          }
-
-          if (target) {
-            t.cooldown = t.fireRate;
-            Sound.playShoot(t.type);
-
-            if (t.type === 1) {
-              // Slow AoE pulse right from tower
-              addParticles(t.x, t.y, '#f72585', 12);
-              enemies.forEach(e => {
-                if (dist(t.x, t.y, e.x, e.y) <= t.range) {
-                  e.hp -= t.damage;
-                  e.slowTimer = 85;
-                  addParticles(e.x, e.y, '#b5179e', 4);
-                }
-              });
-            } else {
-              // Projectile shot
-              projectiles.push({
-                x: t.x,
-                y: t.y,
-                target,
-                damage: t.damage,
-                speed: 7.5,
-                type: t.type,
-                splashRadius: t.type === 2 ? 60 * scale : 0
-              });
-            }
-          }
-        }
-      }
-
-      // Update Projectiles
-      for (let i = projectiles.length - 1; i >= 0; i--) {
-        const p = projectiles[i];
-        const target = p.target;
-
-        // If target disappeared, projectile travels straight
-        const tx = target && target.hp > 0 ? target.x : p.x;
-        const ty = target && target.hp > 0 ? target.y : p.y - 20;
-
-        const dx = tx - p.x;
-        const dy = ty - p.y;
-        const d = Math.hypot(dx, dy);
-
-        if (d < p.speed + 8) {
-          // Hit!
-          if (p.type === 2) {
-            // Explosion
-            Sound.playShoot(2);
-            addParticles(p.x, p.y, '#ff5400', 20, 1.5);
-            enemies.forEach(e => {
-              if (dist(p.x, p.y, e.x, e.y) <= p.splashRadius) {
-                e.hp -= p.damage;
-                addParticles(e.x, e.y, '#ffb703', 4);
-              }
-            });
-          } else {
-            // Direct single hit
-            if (target && target.hp > 0) {
-              target.hp -= p.damage;
-              addParticles(target.x, target.y, '#4cc9f0', 8);
-            }
-          }
-          projectiles.splice(i, 1);
         } else {
-          p.x += (dx / d) * p.speed;
-          p.y += (dy / d) * p.speed;
+          roulette.speed *= 0.965;
+          if (roulette.speed < 0.012) {
+            roulette.active = false;
+            currentState = STATE.PLAY;
+            const chosen = FORTUNES[roulette.targetIndex];
+            applyRouletteEffect(chosen);
+          }
         }
       }
 
       // Update Particles
       for (let i = particles.length - 1; i >= 0; i--) {
-        const part = particles[i];
-        part.x += part.vx;
-        part.y += part.vy;
-        part.life -= part.decay;
-        if (part.life <= 0) particles.splice(i, 1);
+        const p = particles[i];
+        p.x += p.vx;
+        p.y += p.vy;
+        p.life -= p.decay;
+        if (p.life <= 0) particles.splice(i, 1);
       }
 
       // Update Popups
@@ -885,437 +805,411 @@
 
     // --- Drawing Routines ---
 
-    // Draw Sacred Shrine Ground & Torii / Path
-    function drawMap() {
-      // Grass & moss base
+    // Draw Japanese Shrine Atmosphere & Background
+    function drawBackground() {
+      // Soft mystical gradient
       const bgGrad = ctx.createLinearGradient(0, 0, 0, height);
-      bgGrad.addColorStop(0, '#12231e');
-      bgGrad.addColorStop(1, '#0e1815');
+      if (feverTimer > 0) {
+        bgGrad.addColorStop(0, '#3a1c28');
+        bgGrad.addColorStop(0.5, '#4a2822');
+        bgGrad.addColorStop(1, '#2d1521');
+      } else {
+        bgGrad.addColorStop(0, '#1c1322');
+        bgGrad.addColorStop(0.5, '#261a2e');
+        bgGrad.addColorStop(1, '#150f1a');
+      }
       ctx.fillStyle = bgGrad;
       ctx.fillRect(0, 0, width, height);
 
-      // Gravel & Cobblestone Winding Approach (参道)
+      // Distant shrine lanterns & torii silhouettes
       ctx.save();
-      ctx.lineCap = 'round';
-      ctx.lineJoin = 'round';
-
-      // Path outer gravel border
-      ctx.strokeStyle = '#38473c';
-      ctx.lineWidth = 42 * scale;
-      ctx.beginPath();
-      waypoints.forEach((p, idx) => {
-        if (idx === 0) ctx.moveTo(p.x, p.y);
-        else ctx.lineTo(p.x, p.y);
-      });
-      ctx.stroke();
-
-      // Path inner stone pavement
-      ctx.strokeStyle = '#d8c7a6';
-      ctx.lineWidth = 32 * scale;
-      ctx.beginPath();
-      waypoints.forEach((p, idx) => {
-        if (idx === 0) ctx.moveTo(p.x, p.y);
-        else ctx.lineTo(p.x, p.y);
-      });
-      ctx.stroke();
-
-      // Stone flagstone seams pattern
-      ctx.strokeStyle = 'rgba(120, 105, 85, 0.45)';
+      ctx.strokeStyle = 'rgba(255, 183, 3, 0.1)';
       ctx.lineWidth = 2;
-      ctx.setLineDash([8, 14]);
-      ctx.stroke();
-      ctx.setLineDash([]);
-
-      // Entrance Torii Gate (Top Left)
-      const torii = waypoints[0];
-      ctx.fillStyle = '#b7094c';
-      ctx.shadowColor = 'rgba(0,0,0,0.5)';
-      ctx.shadowBlur = 6;
-      ctx.fillRect(torii.x - 24 * scale, torii.y - 18 * scale, 48 * scale, 7 * scale);
-      ctx.fillRect(torii.x - 20 * scale, torii.y - 12 * scale, 40 * scale, 5 * scale);
-      ctx.fillRect(torii.x - 18 * scale, torii.y - 12 * scale, 6 * scale, 24 * scale);
-      ctx.fillRect(torii.x + 12 * scale, torii.y - 12 * scale, 6 * scale, 24 * scale);
-      ctx.shadowBlur = 0;
-
-      // Sanctuary Temple Roof (本殿の屋根) behind Miko
-      const shrine = waypoints[waypoints.length - 1];
-      ctx.fillStyle = '#223028';
-      ctx.fillRect(shrine.x - 55 * scale, shrine.y - 28 * scale, 110 * scale, 52 * scale);
-
-      // Ornate Sacred Red Roof
-      ctx.fillStyle = '#9d0208';
-      ctx.beginPath();
-      ctx.moveTo(shrine.x - 65 * scale, shrine.y - 8 * scale);
-      ctx.lineTo(shrine.x + 65 * scale, shrine.y - 8 * scale);
-      ctx.lineTo(shrine.x + 45 * scale, shrine.y - 34 * scale);
-      ctx.lineTo(shrine.x - 45 * scale, shrine.y - 34 * scale);
-      ctx.closePath();
-      ctx.fill();
-
-      // Gold Roof Ridge (千木・堅魚木)
-      ctx.strokeStyle = '#ffb703';
-      ctx.lineWidth = 3 * scale;
-      ctx.beginPath();
-      ctx.moveTo(shrine.x - 42 * scale, shrine.y - 34 * scale);
-      ctx.lineTo(shrine.x + 42 * scale, shrine.y - 34 * scale);
-      ctx.stroke();
-
+      ctx.strokeRect(boardX - 4, boardY - 4, tileSize * COLS + 8, tileSize * ROWS + 8);
       ctx.restore();
     }
 
-    // Draw Miko Guardian Avatar at Shrine Entrance
-    function drawMikoGuardian() {
+    // Draw Miko Character & Speech Dialog
+    function drawMikoSection() {
       const pos = getMikoPosition();
       const x = pos.x;
       const y = pos.y + mikoAnim.jumpY;
-      const size = 88 * scale;
+      const size = 96 * scale;
 
       ctx.save();
       ctx.translate(x, y);
+      if (mikoAnim.shakeAngle > 0) {
+        ctx.rotate(Math.sin(Date.now() * 0.05) * mikoAnim.shakeAngle);
+      }
 
-      // Sacred lotus gold pedestal
-      ctx.fillStyle = 'rgba(255, 183, 3, 0.25)';
+      // Sacred golden glow base
+      ctx.fillStyle = feverTimer > 0 ? 'rgba(255, 215, 0, 0.35)' : 'rgba(255, 182, 193, 0.2)';
       ctx.beginPath();
-      ctx.ellipse(0, 0, size * 0.48, size * 0.18, 0, 0, Math.PI * 2);
+      ctx.ellipse(0, size * 0.44, size * 0.45, size * 0.16, 0, 0, Math.PI * 2);
       ctx.fill();
 
-      // Bell sound shockwave rings
-      for (const ring of mikoAnim.waveRings) {
-        ctx.strokeStyle = `rgba(255, 215, 0, ${ring.life})`;
-        ctx.lineWidth = 3;
-        ctx.beginPath();
-        ctx.arc(0, -size * 0.35, ring.radius, 0, Math.PI * 2);
-        ctx.stroke();
+      // Salt Purification particles
+      if (mikoAnim.saltTimer > 0) {
+        ctx.fillStyle = '#ffffff';
+        for (let i = 0; i < 6; i++) {
+          ctx.beginPath();
+          ctx.arc(
+            (Math.random() - 0.5) * size * 1.2,
+            -Math.random() * size * 0.8,
+            2.5 * scale,
+            0,
+            Math.PI * 2
+          );
+          ctx.fill();
+        }
       }
 
       if (isMikoLoaded) {
-        // Draw Miko image in holy circle frame
-        ctx.shadowColor = 'rgba(255, 183, 3, 0.7)';
+        // Draw image in circular ornate shrine frame
+        ctx.shadowColor = feverTimer > 0 ? '#ffd166' : 'rgba(255, 120, 160, 0.6)';
         ctx.shadowBlur = 12;
 
         ctx.save();
         ctx.beginPath();
-        ctx.arc(0, -size * 0.44, size * 0.44, 0, Math.PI * 2);
+        ctx.arc(0, 0, size * 0.44, 0, Math.PI * 2);
         ctx.clip();
-        ctx.drawImage(mikoImg, -size * 0.48, -size * 0.9, size * 0.96, size * 0.96);
+        ctx.drawImage(mikoImg, -size * 0.48, -size * 0.48, size * 0.96, size * 0.96);
         ctx.restore();
 
-        // Golden rim
-        ctx.strokeStyle = '#ffd166';
+        // Rim
+        ctx.strokeStyle = feverTimer > 0 ? '#ffd166' : '#ff758f';
         ctx.lineWidth = 3.5;
         ctx.beginPath();
-        ctx.arc(0, -size * 0.44, size * 0.44, 0, Math.PI * 2);
+        ctx.arc(0, 0, size * 0.44, 0, Math.PI * 2);
         ctx.stroke();
       } else {
         // Fallback Vector Chibi Miko
         ctx.shadowColor = 'rgba(0,0,0,0.4)';
         ctx.shadowBlur = 6;
 
-        // White Kimono Body
+        // White Kimono Upper
         ctx.fillStyle = '#ffffff';
         ctx.beginPath();
-        ctx.ellipse(0, -size * 0.35, 18 * scale, 14 * scale, 0, 0, Math.PI * 2);
+        ctx.ellipse(0, size * 0.1, 19 * scale, 15 * scale, 0, 0, Math.PI * 2);
         ctx.fill();
 
-        // Scarlet Hakama Skirt
+        // Scarlet Hakama
         ctx.fillStyle = '#d90429';
         ctx.beginPath();
-        ctx.moveTo(-16 * scale, -size * 0.35);
-        ctx.lineTo(16 * scale, -size * 0.35);
-        ctx.lineTo(22 * scale, -2);
-        ctx.lineTo(-22 * scale, -2);
+        ctx.moveTo(-16 * scale, size * 0.1);
+        ctx.lineTo(16 * scale, size * 0.1);
+        ctx.lineTo(24 * scale, size * 0.45);
+        ctx.lineTo(-24 * scale, size * 0.45);
         ctx.closePath();
         ctx.fill();
 
-        // Face & Blushes
+        // Face & Rosy Cheeks
         ctx.fillStyle = '#ffe5d9';
         ctx.beginPath();
-        ctx.arc(0, -size * 0.62, 18 * scale, 0, Math.PI * 2);
+        ctx.arc(0, -size * 0.16, 18 * scale, 0, Math.PI * 2);
         ctx.fill();
+
         ctx.fillStyle = 'rgba(255, 100, 140, 0.55)';
         ctx.beginPath();
-        ctx.arc(-9 * scale, -size * 0.58, 3 * scale, 0, Math.PI * 2);
-        ctx.arc(9 * scale, -size * 0.58, 3 * scale, 0, Math.PI * 2);
+        ctx.arc(-8 * scale, -size * 0.12, 3.2 * scale, 0, Math.PI * 2);
+        ctx.arc(8 * scale, -size * 0.12, 3.2 * scale, 0, Math.PI * 2);
         ctx.fill();
 
-        // Black Twin Tails
+        // Dark Hair & Ribbon
         ctx.fillStyle = '#1c1722';
         ctx.beginPath();
-        ctx.arc(0, -size * 0.66, 20 * scale, Math.PI, Math.PI * 2);
-        ctx.arc(-14 * scale, -size * 0.58, 7 * scale, 0, Math.PI * 2);
-        ctx.arc(14 * scale, -size * 0.58, 7 * scale, 0, Math.PI * 2);
+        ctx.arc(0, -size * 0.2, 21 * scale, Math.PI, Math.PI * 2);
+        ctx.arc(-15 * scale, -size * 0.1, 8 * scale, 0, Math.PI * 2);
+        ctx.arc(15 * scale, -size * 0.1, 8 * scale, 0, Math.PI * 2);
         ctx.fill();
 
-        // Ribbon
         ctx.fillStyle = '#d90429';
-        ctx.fillRect(-12 * scale, -size * 0.85, 24 * scale, 6 * scale);
+        ctx.fillRect(-12 * scale, -size * 0.42, 24 * scale, 6 * scale);
 
-        // Eyes
+        // Big Sparkly Eyes
         ctx.fillStyle = '#3a202c';
         ctx.beginPath();
-        ctx.arc(-6 * scale, -size * 0.62, 2.8 * scale, 0, Math.PI * 2);
-        ctx.arc(6 * scale, -size * 0.62, 2.8 * scale, 0, Math.PI * 2);
+        ctx.arc(-6 * scale, -size * 0.16, 3 * scale, 0, Math.PI * 2);
+        ctx.arc(6 * scale, -size * 0.16, 3 * scale, 0, Math.PI * 2);
         ctx.fill();
 
-        // Golden Kagura Suzu in hands
+        // Golden Kagura Bell in hands
         ctx.fillStyle = '#ffd166';
         ctx.beginPath();
-        ctx.arc(14 * scale, -size * 0.36, 6 * scale, 0, Math.PI * 2);
+        ctx.arc(13 * scale, size * 0.12, 6 * scale, 0, Math.PI * 2);
         ctx.fill();
       }
 
-      // Tap Skill Label Pill
-      ctx.shadowBlur = 0;
-      const canSkill = faithPoints >= SKILL_COST && skillCooldown === 0;
-      ctx.fillStyle = canSkill ? '#ffd166' : 'rgba(40, 30, 50, 0.8)';
-      ctx.strokeStyle = canSkill ? '#ffffff' : '#555';
+      ctx.restore();
+
+      // Miko Speech Bubble (Tips & Encouragement)
+      const bubbleX = pos.x + size * 0.56;
+      const bubbleY = pos.y - 32 * scale;
+      const bubbleW = width - bubbleX - 18;
+      const bubbleH = 68 * scale;
+
+      ctx.save();
+      ctx.fillStyle = 'rgba(38, 28, 48, 0.92)';
+      ctx.strokeStyle = feverTimer > 0 ? '#ffd166' : 'rgba(255, 117, 143, 0.6)';
       ctx.lineWidth = 1.5;
       ctx.beginPath();
-      ctx.roundRect(-42 * scale, 8 * scale, 84 * scale, 20 * scale, 10);
+      ctx.roundRect(bubbleX, bubbleY, bubbleW, bubbleH, 12);
       ctx.fill();
       ctx.stroke();
 
-      ctx.fillStyle = canSkill ? '#1a1005' : '#aaa';
+      // Dialogue Text
+      ctx.fillStyle = feverTimer > 0 ? '#ffd166' : '#ffffff';
+      ctx.font = `bold ${12 * scale}px sans-serif`;
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'top';
+
+      let speech = '3つ揃えて徳を積みましょう♪';
+      if (feverTimer > 0) speech = `黄金フィーバー中！ (残り${feverTimer}s)`;
+      else if (comboChain > 1) speech = `見事な連鎖！ ${comboChain}連鎖突破！`;
+      else if (boardHasRocks()) speech = '私をタップでお清めの塩を！';
+
+      ctx.fillText(speech, bubbleX + 10, bubbleY + 12 * scale);
+
+      ctx.fillStyle = '#ffb703';
       ctx.font = `bold ${10 * scale}px sans-serif`;
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      const label = canSkill ? `🔔 祈祷(${SKILL_COST})` : (skillCooldown > 0 ? `充填中...` : `要${SKILL_COST}信仰`);
-      ctx.fillText(label, 0, 18 * scale);
+      ctx.fillText('🔔 タップで厄払い・神楽鈴祈願', bubbleX + 10, bubbleY + 38 * scale);
 
       ctx.restore();
     }
 
-    // Draw Ofuda Towers
-    function drawTowers() {
-      ctx.save();
-      for (const t of towers) {
-        // Selection range circle
-        if (selectedTower === t) {
-          ctx.strokeStyle = 'rgba(255, 215, 0, 0.45)';
-          ctx.lineWidth = 2;
-          ctx.beginPath();
-          ctx.arc(t.x, t.y, t.range, 0, Math.PI * 2);
-          ctx.stroke();
-
-          ctx.fillStyle = 'rgba(255, 215, 0, 0.08)';
-          ctx.fill();
+    function boardHasRocks() {
+      for (let r = 0; r < ROWS; r++) {
+        for (let c = 0; c < COLS; c++) {
+          if (board[r][c]?.type === -1) return true;
         }
+      }
+      return false;
+    }
 
-        // Stone or wooden pedestal
-        ctx.fillStyle = '#343a40';
+    // Draw Top Header HUD (Score, Time, Virtue Bar)
+    function drawHeaderUI() {
+      ctx.save();
+
+      // Top Status Bar Container
+      const barH = 58;
+      ctx.fillStyle = 'rgba(20, 14, 25, 0.88)';
+      ctx.fillRect(0, 0, width, barH);
+      ctx.strokeStyle = '#382645';
+      ctx.beginPath();
+      ctx.moveTo(0, barH);
+      ctx.lineTo(width, barH);
+      ctx.stroke();
+
+      // Score
+      ctx.fillStyle = '#a0aec0';
+      ctx.font = 'bold 10px sans-serif';
+      ctx.fillText('奉納得点', 16, 20);
+      ctx.fillStyle = feverTimer > 0 ? '#ffd166' : '#ffffff';
+      ctx.font = '900 22px sans-serif';
+      ctx.fillText(`${score}`, 16, 44);
+
+      // Remaining Time
+      ctx.textAlign = 'right';
+      ctx.fillStyle = '#ff758f';
+      ctx.font = 'bold 10px sans-serif';
+      ctx.fillText('残り時間', width - 16, 20);
+      ctx.fillStyle = timeLeft <= 10 ? '#e63946' : '#ffffff';
+      ctx.font = '900 22px sans-serif';
+      ctx.fillText(`${timeLeft}s`, width - 16, 44);
+
+      // Virtue Gauge (徳ゲージ) below Miko
+      const gaugeY = boardY - 32;
+      const gaugeW = width - 36;
+      const gaugeX = 18;
+      const gaugeH = 14;
+
+      ctx.textAlign = 'left';
+      ctx.fillStyle = '#ffd166';
+      ctx.font = 'bold 11px sans-serif';
+      ctx.fillText(`徳ゲージ: ${Math.floor(virtueGauge)}%`, gaugeX, gaugeY - 5);
+
+      // Background trough
+      ctx.fillStyle = '#261b33';
+      ctx.strokeStyle = '#4e3860';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.roundRect(gaugeX, gaugeY, gaugeW, gaugeH, 7);
+      ctx.fill();
+      ctx.stroke();
+
+      // Filled progress with golden gradient
+      const progressW = Math.max(0, (virtueGauge / MAX_VIRTUE) * gaugeW);
+      if (progressW > 0) {
+        const pGrad = ctx.createLinearGradient(gaugeX, 0, gaugeX + progressW, 0);
+        pGrad.addColorStop(0, '#f72585');
+        pGrad.addColorStop(1, '#ffd166');
+        ctx.fillStyle = pGrad;
         ctx.beginPath();
-        ctx.arc(t.x, t.y + 4, t.radius * 0.95, 0, Math.PI * 2);
+        ctx.roundRect(gaugeX, gaugeY, progressW, gaugeH, 7);
+        ctx.fill();
+      }
+
+      ctx.restore();
+    }
+
+    // Draw Puzzle Grid & Japanese Good Luck Pieces
+    function drawPuzzleBoard() {
+      ctx.save();
+
+      // Board Background Table
+      ctx.fillStyle = 'rgba(28, 19, 35, 0.9)';
+      ctx.beginPath();
+      ctx.roundRect(boardX - 6, boardY - 6, tileSize * COLS + 12, tileSize * ROWS + 12, 12);
+      ctx.fill();
+
+      for (let r = 0; r < ROWS; r++) {
+        for (let c = 0; c < COLS; c++) {
+          const x = boardX + c * tileSize;
+          const y = boardY + r * tileSize;
+
+          // Grid Cell background tile
+          ctx.fillStyle = (r + c) % 2 === 0 ? 'rgba(44, 30, 54, 0.65)' : 'rgba(38, 26, 48, 0.65)';
+          ctx.fillRect(x + 2, y + 2, tileSize - 4, tileSize - 4);
+
+          const piece = board[r][c];
+          if (!piece) continue;
+
+          const py = y + (piece.animY || 0);
+          const isSelected = selectedTile && selectedTile.r === r && selectedTile.c === c;
+
+          ctx.save();
+          ctx.translate(x + tileSize / 2, py + tileSize / 2);
+
+          if (isSelected) {
+            ctx.scale(1.12, 1.12);
+            ctx.strokeStyle = '#ffd166';
+            ctx.lineWidth = 3;
+            ctx.strokeRect(-tileSize * 0.44, -tileSize * 0.44, tileSize * 0.88, tileSize * 0.88);
+          }
+
+          if (piece.type === -1) {
+            // Evil Rock Obstacle (厄石)
+            ctx.fillStyle = '#495057';
+            ctx.beginPath();
+            ctx.roundRect(-tileSize * 0.38, -tileSize * 0.38, tileSize * 0.76, tileSize * 0.76, 6);
+            ctx.fill();
+            ctx.fillStyle = '#ff4d6d';
+            ctx.font = `bold ${13 * scale}px sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('厄', 0, 0);
+          } else {
+            // Auspicious Japanese Piece Icon
+            const info = PIECE_TYPES[piece.type];
+
+            // Soft glowing rounded tile
+            ctx.fillStyle = info.bg;
+            ctx.shadowColor = info.color;
+            ctx.shadowBlur = 6;
+            ctx.beginPath();
+            ctx.roundRect(-tileSize * 0.38, -tileSize * 0.38, tileSize * 0.76, tileSize * 0.76, 10);
+            ctx.fill();
+            ctx.shadowBlur = 0;
+
+            // Border
+            ctx.strokeStyle = info.color;
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            // Distinctive Japanese Element Drawing
+            ctx.fillStyle = info.color;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.font = `bold ${16 * scale}px 'Hiragino Mincho ProN', serif`;
+            ctx.fillText(info.kanji, 0, 1);
+          }
+
+          ctx.restore();
+        }
+      }
+
+      ctx.restore();
+    }
+
+    // Draw Pop-up Omikuji Roulette Disk
+    function drawOmikujiRoulette() {
+      if (!roulette.active) return;
+
+      ctx.save();
+      // Backdrop
+      ctx.fillStyle = 'rgba(8, 5, 12, 0.75)';
+      ctx.fillRect(0, 0, width, height);
+
+      const cx = width / 2;
+      const cy = height * 0.52;
+      const radius = 125 * scale;
+
+      ctx.textAlign = 'center';
+      ctx.fillStyle = '#ffd166';
+      ctx.font = '900 24px sans-serif';
+      ctx.shadowColor = '#ffd166';
+      ctx.shadowBlur = 12;
+      ctx.fillText('神意託宣・おみくじ回転！', cx, cy - radius - 30);
+      ctx.shadowBlur = 0;
+
+      // Rotating Wheel
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.rotate(roulette.angle);
+
+      const slice = (Math.PI * 2) / FORTUNES.length;
+      FORTUNES.forEach((f, i) => {
+        const startAng = i * slice;
+        const endAng = startAng + slice;
+
+        ctx.fillStyle = f.color;
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.arc(0, 0, radius, startAng, endAng);
+        ctx.closePath();
         ctx.fill();
 
-        // Ofuda Talisman Paper
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        // Fortune Text on Wheel
         ctx.save();
-        ctx.translate(t.x, t.y);
-
-        // Sacred Floating Ofuda paper
-        ctx.fillStyle = '#fffdf0';
-        ctx.shadowColor = t.type === 2 ? '#ff5400' : (t.type === 1 ? '#b5179e' : '#4cc9f0');
-        ctx.shadowBlur = 8;
-        ctx.fillRect(-11 * scale, -18 * scale, 22 * scale, 32 * scale);
-
-        // Top sacred cut angle
-        ctx.fillStyle = '#d90429';
-        ctx.beginPath();
-        ctx.moveTo(-11 * scale, -18 * scale);
-        ctx.lineTo(0, -22 * scale);
-        ctx.lineTo(11 * scale, -18 * scale);
-        ctx.lineTo(11 * scale, -14 * scale);
-        ctx.lineTo(-11 * scale, -14 * scale);
-        ctx.fill();
-
-        // Red Calligraphy Kanji Rune
-        ctx.fillStyle = '#d90429';
-        ctx.font = `bold ${11 * scale}px sans-serif`;
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(t.subName, 0, -2 * scale);
-
-        // Level stars
-        ctx.fillStyle = '#ffb703';
-        ctx.font = `bold ${9 * scale}px sans-serif`;
-        let stars = '★'.repeat(t.level);
-        ctx.fillText(stars, 0, 8 * scale);
-
+        ctx.rotate(startAng + slice / 2);
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 18px sans-serif';
+        ctx.textAlign = 'right';
+        ctx.fillText(f.name, radius - 18, 6);
         ctx.restore();
+      });
 
-        // Tower Sub-Menu (Upgrade / Sell)
-        if (selectedTower === t) {
-          drawTowerSubMenu(t);
-        }
-      }
-      ctx.restore();
-    }
-
-    // Tower Upgrade / Sell Bubble Menu
-    function drawTowerSubMenu(t) {
-      ctx.save();
-      const menuY = t.y - 52 * scale;
-      const upgradeCost = Math.floor(t.totalInvested * 0.75);
-      const refund = Math.floor(t.totalInvested * 0.65);
-
-      // Upgrade Button (Left)
-      const ux = t.x - 36 * scale;
-      const canUpgrade = t.level < 3 && faithPoints >= upgradeCost;
-      ctx.fillStyle = canUpgrade ? '#06d6a0' : '#495057';
+      // Center Hub
+      ctx.fillStyle = '#ffd166';
       ctx.beginPath();
-      ctx.arc(ux, menuY, 18 * scale, 0, Math.PI * 2);
+      ctx.arc(0, 0, 26 * scale, 0, Math.PI * 2);
       ctx.fill();
-      ctx.fillStyle = '#ffffff';
-      ctx.font = `bold ${10 * scale}px sans-serif`;
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(t.level >= 3 ? 'MAX' : `強化`, ux, menuY - 4 * scale);
-      ctx.font = `9px sans-serif`;
-      ctx.fillText(t.level >= 3 ? '' : `${upgradeCost}`, ux, menuY + 6 * scale);
+      ctx.fillStyle = '#1c1322';
+      ctx.font = 'bold 12px sans-serif';
+      ctx.fillText('神', 0, 4);
 
-      // Sell Button (Right)
-      const sx = t.x + 36 * scale;
-      ctx.fillStyle = '#e63946';
+      ctx.restore();
+
+      // Top Needle Indicator
+      ctx.fillStyle = '#ffffff';
+      ctx.shadowColor = '#000';
+      ctx.shadowBlur = 6;
       ctx.beginPath();
-      ctx.arc(sx, menuY, 18 * scale, 0, Math.PI * 2);
+      ctx.moveTo(cx, cy - radius - 6);
+      ctx.lineTo(cx - 14, cy - radius + 18);
+      ctx.lineTo(cx + 14, cy - radius + 18);
+      ctx.closePath();
       ctx.fill();
+
+      // Sub-Prompt
       ctx.fillStyle = '#ffffff';
-      ctx.font = `bold ${10 * scale}px sans-serif`;
-      ctx.fillText('撤去', sx, menuY - 4 * scale);
-      ctx.font = `9px sans-serif`;
-      ctx.fillText(`+${refund}`, sx, menuY + 6 * scale);
+      ctx.font = '13px sans-serif';
+      ctx.fillText(roulette.stopping ? '神託が定まるのを待っています...' : '画面をタップして止める！', cx, cy + radius + 40);
 
-      ctx.restore();
-    }
-
-    // Draw Japanese Yokai Enemies
-    function drawEnemies() {
-      ctx.save();
-      for (const e of enemies) {
-        ctx.save();
-        ctx.translate(e.x, e.y);
-
-        // Wobble walk
-        const wobble = Math.sin(gameTimer * 0.2 + e.wobble) * 3;
-
-        // Slow effect icy/magic glow
-        if (e.slowTimer > 0) {
-          ctx.strokeStyle = 'rgba(181, 23, 158, 0.8)';
-          ctx.lineWidth = 3;
-          ctx.beginPath();
-          ctx.arc(0, 0, e.radius + 4, 0, Math.PI * 2);
-          ctx.stroke();
-        }
-
-        if (e.type === 0) {
-          // 小鬼 (Little Red/Blue Imp)
-          ctx.fillStyle = '#e63946';
-          ctx.beginPath();
-          ctx.arc(0, wobble, e.radius, 0, Math.PI * 2);
-          ctx.fill();
-
-          // Horn
-          ctx.fillStyle = '#ffd166';
-          ctx.beginPath();
-          ctx.moveTo(-4 * scale, wobble - e.radius);
-          ctx.lineTo(0, wobble - e.radius - 8 * scale);
-          ctx.lineTo(4 * scale, wobble - e.radius);
-          ctx.fill();
-
-          // Eyes
-          ctx.fillStyle = '#ffffff';
-          ctx.beginPath();
-          ctx.arc(-4 * scale, wobble - 2, 3 * scale, 0, Math.PI * 2);
-          ctx.arc(4 * scale, wobble - 2, 3 * scale, 0, Math.PI * 2);
-          ctx.fill();
-          ctx.fillStyle = '#000';
-          ctx.beginPath();
-          ctx.arc(-4 * scale, wobble - 2, 1.5 * scale, 0, Math.PI * 2);
-          ctx.arc(4 * scale, wobble - 2, 1.5 * scale, 0, Math.PI * 2);
-          ctx.fill();
-        } else if (e.type === 1) {
-          // からかさ小僧 (One-eyed umbrella)
-          ctx.fillStyle = '#9b5de5';
-          // Umbrella cone
-          ctx.beginPath();
-          ctx.moveTo(0, wobble - e.radius - 8 * scale);
-          ctx.lineTo(-e.radius * 1.2, wobble + 4);
-          ctx.lineTo(e.radius * 1.2, wobble + 4);
-          ctx.closePath();
-          ctx.fill();
-
-          // Big single eye
-          ctx.fillStyle = '#ffffff';
-          ctx.beginPath();
-          ctx.arc(0, wobble - 4, 6 * scale, 0, Math.PI * 2);
-          ctx.fill();
-          ctx.fillStyle = '#ff0054';
-          ctx.beginPath();
-          ctx.arc(0, wobble - 4, 3 * scale, 0, Math.PI * 2);
-          ctx.fill();
-
-          // Long tongue
-          ctx.fillStyle = '#ff758f';
-          ctx.fillRect(-2 * scale, wobble + 2, 4 * scale, 8 * scale);
-        } else {
-          // 大入道 (Giant Monkish Boss)
-          ctx.fillStyle = '#2b2d42';
-          ctx.beginPath();
-          ctx.arc(0, wobble, e.radius, 0, Math.PI * 2);
-          ctx.fill();
-
-          // Golden sacred beads necklace
-          ctx.strokeStyle = '#ffb703';
-          ctx.lineWidth = 3;
-          ctx.beginPath();
-          ctx.arc(0, wobble + 6, e.radius * 0.7, 0, Math.PI);
-          ctx.stroke();
-
-          // Fierce red glowing eyes
-          ctx.fillStyle = '#f72585';
-          ctx.beginPath();
-          ctx.arc(-7 * scale, wobble - 4, 3.5 * scale, 0, Math.PI * 2);
-          ctx.arc(7 * scale, wobble - 4, 3.5 * scale, 0, Math.PI * 2);
-          ctx.fill();
-        }
-
-        // HP Bar
-        const barW = e.radius * 2.2;
-        const barH = 4 * scale;
-        const hpRatio = Math.max(0, e.hp / e.maxHp);
-        ctx.fillStyle = 'rgba(0,0,0,0.6)';
-        ctx.fillRect(-barW / 2, -e.radius - 12 * scale, barW, barH);
-        ctx.fillStyle = hpRatio > 0.4 ? '#06d6a0' : '#e63946';
-        ctx.fillRect(-barW / 2, -e.radius - 12 * scale, barW * hpRatio, barH);
-
-        ctx.restore();
-      }
-      ctx.restore();
-    }
-
-    // Draw Magical Projectiles
-    function drawProjectiles() {
-      ctx.save();
-      for (const p of projectiles) {
-        if (p.type === 2) {
-          // Fire spirit orb
-          const grad = ctx.createRadialGradient(p.x, p.y, 2, p.x, p.y, 8);
-          grad.addColorStop(0, '#ffffff');
-          grad.addColorStop(0.4, '#ffb703');
-          grad.addColorStop(1, '#ff5400');
-          ctx.fillStyle = grad;
-          ctx.beginPath();
-          ctx.arc(p.x, p.y, 7 * scale, 0, Math.PI * 2);
-          ctx.fill();
-        } else {
-          // Sacred blue light arrow
-          ctx.fillStyle = '#ffffff';
-          ctx.shadowColor = '#4cc9f0';
-          ctx.shadowBlur = 8;
-          ctx.beginPath();
-          ctx.arc(p.x, p.y, 4.5 * scale, 0, Math.PI * 2);
-          ctx.fill();
-        }
-      }
       ctx.restore();
     }
 
@@ -1332,126 +1226,33 @@
 
       for (const pop of popups) {
         ctx.globalAlpha = Math.max(0, pop.life);
-        ctx.font = 'bold 15px "Hiragino Kaku Gothic ProN", sans-serif';
+        ctx.font = 'bold 16px "Hiragino Kaku Gothic ProN", sans-serif';
         ctx.textAlign = 'center';
         ctx.fillStyle = pop.color;
         ctx.shadowColor = '#000';
-        ctx.shadowBlur = 5;
+        ctx.shadowBlur = 6;
         ctx.fillText(pop.text, pop.x, pop.y);
       }
       ctx.restore();
     }
 
-    // Draw Play HUD & Tower Selector Tray
-    function drawPlayUI() {
-      ctx.save();
-
-      // Top Info Banner
-      ctx.fillStyle = 'rgba(15, 20, 24, 0.9)';
-      ctx.fillRect(0, 0, width, 68);
-      ctx.strokeStyle = '#2d3748';
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.moveTo(0, 68);
-      ctx.lineTo(width, 68);
-      ctx.stroke();
-
-      // Faith points
-      ctx.fillStyle = '#ffd166';
-      ctx.font = 'bold 11px sans-serif';
-      ctx.fillText('信仰ポイント', 16, 22);
-      ctx.font = '900 24px sans-serif';
-      ctx.fillText(`${faithPoints}`, 16, 50);
-
-      // Wave Status
-      ctx.textAlign = 'center';
-      ctx.fillStyle = '#a0aec0';
-      ctx.font = 'bold 11px sans-serif';
-      ctx.fillText('襲来状況', width / 2, 22);
-      ctx.fillStyle = '#ffffff';
-      ctx.font = '900 20px sans-serif';
-      ctx.fillText(`WAVE ${wave} / ${MAX_WAVE}`, width / 2, 48);
-
-      // Sanctuary Barrier Hearts
-      ctx.textAlign = 'right';
-      ctx.fillStyle = '#ff758f';
-      ctx.font = 'bold 11px sans-serif';
-      ctx.fillText('本殿結界', width - 16, 22);
-
-      ctx.fillStyle = '#e63946';
-      ctx.font = '900 22px sans-serif';
-      ctx.fillText(`🛡️ ${life} / ${MAX_LIFE}`, width - 16, 48);
-
-      // Bottom Tower Selector Dock
-      const hudY = height - 76;
-      ctx.fillStyle = 'rgba(16, 24, 22, 0.94)';
-      ctx.fillRect(0, hudY, width, 76);
-      ctx.strokeStyle = '#38473c';
-      ctx.beginPath();
-      ctx.moveTo(0, hudY);
-      ctx.lineTo(width, hudY);
-      ctx.stroke();
-
-      const btnW = (width - 32) / 3;
-      for (let i = 0; i < 3; i++) {
-        const cfg = TOWER_TYPES[i];
-        const bx = 16 + i * btnW;
-        const by = hudY + 6;
-        const bw = btnW - 8;
-        const bh = 64;
-        const isSelected = selectedBuildIndex === i;
-        const canAfford = faithPoints >= cfg.cost;
-
-        ctx.fillStyle = isSelected ? 'rgba(255, 215, 0, 0.22)' : 'rgba(30, 42, 38, 0.8)';
-        ctx.strokeStyle = isSelected ? '#ffd166' : (canAfford ? '#4a5568' : '#2d3748');
-        ctx.lineWidth = isSelected ? 2 : 1;
-        ctx.beginPath();
-        ctx.roundRect(bx, by, bw, bh, 10);
-        ctx.fill();
-        ctx.stroke();
-
-        // Tower Icon Badge
-        ctx.fillStyle = cfg.color;
-        ctx.beginPath();
-        ctx.arc(bx + 18, by + bh / 2, 12, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.fillStyle = '#fff';
-        ctx.font = 'bold 10px sans-serif';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(cfg.subName[0], bx + 18, by + bh / 2);
-
-        // Tower Name & Cost
-        ctx.textAlign = 'left';
-        ctx.fillStyle = canAfford ? '#ffffff' : '#888888';
-        ctx.font = 'bold 12px sans-serif';
-        ctx.fillText(cfg.name, bx + 36, by + 22);
-
-        ctx.fillStyle = canAfford ? '#ffd166' : '#666';
-        ctx.font = 'bold 13px sans-serif';
-        ctx.fillText(`${cfg.cost} 信仰`, bx + 36, by + 44);
-      }
-
-      ctx.restore();
-    }
-
-    // Title Screen
+    // Draw Title Screen
     function drawTitleScreen() {
       ctx.save();
-      ctx.fillStyle = 'rgba(12, 18, 16, 0.88)';
+      ctx.fillStyle = 'rgba(14, 10, 18, 0.94)';
       ctx.fillRect(0, 0, width, height);
 
       ctx.textAlign = 'center';
-      ctx.shadowColor = 'rgba(255, 183, 3, 0.7)';
+      ctx.shadowColor = 'rgba(255, 105, 180, 0.7)';
       ctx.shadowBlur = 18;
 
-      ctx.fillStyle = '#ffd166';
+      ctx.fillStyle = '#ff758f';
       ctx.font = 'bold 16px sans-serif';
-      ctx.fillText('〜 神聖なる結界と護法の祈り 〜', width / 2, height * 0.22);
+      ctx.fillText('〜 縁起物マッチ＆運命の神託 〜', width / 2, height * 0.22);
 
       ctx.fillStyle = '#ffffff';
       ctx.font = '900 32px sans-serif';
-      ctx.fillText('境内防衛・お札TD', width / 2, height * 0.29);
+      ctx.fillText('おみくじパズル', width / 2, height * 0.29);
 
       ctx.shadowBlur = 0;
       const cardW = Math.min(width - 40, 380);
@@ -1459,33 +1260,33 @@
       const cardY = height * 0.35;
       const cardH = 250;
 
-      ctx.fillStyle = 'rgba(24, 34, 30, 0.94)';
-      ctx.strokeStyle = 'rgba(255, 215, 0, 0.3)';
+      ctx.fillStyle = 'rgba(32, 22, 42, 0.95)';
+      ctx.strokeStyle = 'rgba(255, 183, 3, 0.35)';
       ctx.lineWidth = 1.5;
       ctx.beginPath();
       ctx.roundRect(cardX, cardY, cardW, cardH, 16);
       ctx.fill();
       ctx.stroke();
 
-      ctx.fillStyle = '#ffffff';
+      ctx.fillStyle = '#ffd166';
       ctx.font = 'bold 16px sans-serif';
-      ctx.fillText('【 防衛心得と神事 】', width / 2, cardY + 36);
+      ctx.fillText('【 参拝・神事の心得 】', width / 2, cardY + 36);
 
       ctx.font = '13px sans-serif';
       ctx.fillStyle = '#e2e8f0';
-      ctx.fillText('⛩️ 参道を歩く妖怪を、お札タワーで迎撃！', width / 2, cardY + 76);
-      ctx.fillText('📜 空き地をタップしてお札を建立・強化', width / 2, cardY + 112);
-      ctx.fillText('🔔 本殿の巫女をタップすると全画面浄化祈祷！', width / 2, cardY + 148);
-      ctx.fillText('⚠️ 本殿に妖怪が侵入すると結界が破損します', width / 2, cardY + 184);
-      ctx.fillText('🌸 全7WAVEを耐え抜いて神域を守護せよ！', width / 2, cardY + 220);
+      ctx.fillText('⛩️ 隣り合う縁起物を入れ替えて3つ揃えよう！', width / 2, cardY + 76);
+      ctx.fillText('🌸 ピースを消すと「徳ゲージ」が蓄積！', width / 2, cardY + 112);
+      ctx.fillText('🥠 ゲージ満タンでおみくじルーレット発動！', width / 2, cardY + 148);
+      ctx.fillText('⚠️ 「凶」が出たら巫女をタップでお清めの塩！', width / 2, cardY + 184);
+      ctx.fillText('✨ 制限時間60秒で最高スコアを目指せ！', width / 2, cardY + 220);
 
       // Start Button
-      const btnY = height * 0.74;
+      const btnY = height * 0.76;
       const btnGrad = ctx.createLinearGradient(width / 2 - 100, 0, width / 2 + 100, 0);
-      btnGrad.addColorStop(0, '#d90429');
+      btnGrad.addColorStop(0, '#ff4d6d');
       btnGrad.addColorStop(1, '#ff758f');
 
-      ctx.shadowColor = 'rgba(217, 4, 41, 0.7)';
+      ctx.shadowColor = 'rgba(255, 77, 109, 0.6)';
       ctx.shadowBlur = 16;
       ctx.fillStyle = btnGrad;
       ctx.beginPath();
@@ -1496,40 +1297,33 @@
       ctx.fillStyle = '#ffffff';
       ctx.font = 'bold 19px sans-serif';
       ctx.textBaseline = 'middle';
-      ctx.fillText('境内の警備を始める', width / 2, btnY);
+      ctx.fillText('お参り（開始）', width / 2, btnY);
 
       ctx.restore();
     }
 
-    // Game Over & Clear Screens
-    function drawResultScreen(isClear) {
+    // Draw Result Screen
+    function drawResultScreen() {
       ctx.save();
-      ctx.fillStyle = 'rgba(10, 15, 14, 0.92)';
+      ctx.fillStyle = 'rgba(12, 8, 16, 0.94)';
       ctx.fillRect(0, 0, width, height);
 
       ctx.textAlign = 'center';
+      ctx.shadowColor = 'rgba(255, 215, 0, 0.8)';
       ctx.shadowBlur = 18;
 
-      if (isClear) {
-        ctx.shadowColor = 'rgba(255, 215, 0, 0.8)';
-        ctx.fillStyle = '#ffd166';
-        ctx.font = '900 36px sans-serif';
-        ctx.fillText('大団円・神域守護成る！', width / 2, height * 0.24);
-      } else {
-        ctx.shadowColor = 'rgba(230, 57, 70, 0.8)';
-        ctx.fillStyle = '#e63946';
-        ctx.font = '900 36px sans-serif';
-        ctx.fillText('本殿結界、瓦解...', width / 2, height * 0.24);
-      }
+      ctx.fillStyle = '#ffd166';
+      ctx.font = '900 34px sans-serif';
+      ctx.fillText('神事納め・参拝完了！', width / 2, height * 0.23);
 
       ctx.shadowBlur = 0;
       const cardW = Math.min(width - 40, 360);
       const cardX = (width - cardW) / 2;
-      const cardY = height * 0.33;
-      const cardH = 240;
+      const cardY = height * 0.32;
+      const cardH = 260;
 
-      ctx.fillStyle = 'rgba(25, 35, 30, 0.95)';
-      ctx.strokeStyle = isClear ? 'rgba(255, 215, 0, 0.4)' : 'rgba(230, 57, 70, 0.4)';
+      ctx.fillStyle = 'rgba(34, 23, 44, 0.95)';
+      ctx.strokeStyle = 'rgba(255, 215, 0, 0.4)';
       ctx.lineWidth = 1.5;
       ctx.beginPath();
       ctx.roundRect(cardX, cardY, cardW, cardH, 16);
@@ -1537,27 +1331,33 @@
       ctx.stroke();
 
       ctx.fillStyle = '#a0aec0';
-      ctx.font = 'bold 14px sans-serif';
-      ctx.fillText('防衛成果', width / 2, cardY + 40);
+      ctx.font = 'bold 13px sans-serif';
+      ctx.fillText('本日の奉納得点', width / 2, cardY + 38);
 
       ctx.fillStyle = '#ffffff';
-      ctx.font = 'bold 22px sans-serif';
-      ctx.fillText(`最終到達: WAVE ${wave} / ${MAX_WAVE}`, width / 2, cardY + 85);
+      ctx.font = '900 32px sans-serif';
+      ctx.fillText(`${score} 点`, width / 2, cardY + 82);
 
-      ctx.fillStyle = '#06d6a0';
-      ctx.font = 'bold 18px sans-serif';
-      ctx.fillText(`妖怪退散数: ${totalKills} 体`, width / 2, cardY + 128);
+      // Best fortune appraisal
+      let fortuneSummary = '穏やかな日和（吉）';
+      if (omikujiHistory.includes('大吉')) fortuneSummary = '万事大願成就（大吉極楽）🌸';
+      else if (omikujiHistory.includes('中吉')) fortuneSummary = '運気上昇・福徳円満（中吉）✨';
+      else if (omikujiHistory.includes('凶')) fortuneSummary = '厄落とし完了・禍転じて福と為す🌿';
 
-      let title = '修行中の神職';
-      if (isClear) title = '神話の守護巫女長 🌸';
-      else if (wave >= 5) title = '手練れの破邪祈祷師 ✨';
-
+      ctx.fillStyle = '#ffb703';
+      ctx.font = 'bold 15px sans-serif';
+      ctx.fillText('【 本日の神託総評 】', width / 2, cardY + 130);
       ctx.fillStyle = '#ffd166';
-      ctx.font = '15px sans-serif';
-      ctx.fillText(`称号: ${title}`, width / 2, cardY + 180);
+      ctx.font = 'bold 17px sans-serif';
+      ctx.fillText(fortuneSummary, width / 2, cardY + 162);
+
+      const historyStr = omikujiHistory.length > 0 ? omikujiHistory.join(' → ') : 'なし';
+      ctx.fillStyle = '#c4b5fd';
+      ctx.font = '12px sans-serif';
+      ctx.fillText(`神託履歴: ${historyStr}`, width / 2, cardY + 208);
 
       // Retry Button
-      const btnY = height * 0.76;
+      const btnY = height * 0.78;
       const btnGrad = ctx.createLinearGradient(width / 2 - 100, 0, width / 2 + 100, 0);
       btnGrad.addColorStop(0, '#06d6a0');
       btnGrad.addColorStop(1, '#118ab2');
@@ -1573,14 +1373,13 @@
       ctx.fillStyle = '#ffffff';
       ctx.font = 'bold 19px sans-serif';
       ctx.textBaseline = 'middle';
-      ctx.fillText(isClear ? 'もう一度遊ぶ' : '再度防衛に挑む', width / 2, btnY);
+      ctx.fillText('もう一度おみくじを引く', width / 2, btnY);
 
       ctx.restore();
     }
 
-    // --- Main Loop ---
-    let lastTime = performance.now();
-    function gameLoop(timestamp) {
+    // --- Main Engine Loop ---
+    function gameLoop() {
       update();
 
       ctx.save();
@@ -1592,11 +1391,10 @@
 
       ctx.clearRect(0, 0, width, height);
 
-      drawMap();
-      drawTowers();
-      drawEnemies();
-      drawMikoGuardian();
-      drawProjectiles();
+      drawBackground();
+      drawHeaderUI();
+      drawMikoSection();
+      drawPuzzleBoard();
       drawParticles();
 
       if (screenFlash > 0) {
@@ -1604,14 +1402,12 @@
         ctx.fillRect(0, 0, width, height);
       }
 
-      if (currentState === STATE.PLAYING) {
-        drawPlayUI();
-      } else if (currentState === STATE.TITLE) {
+      if (currentState === STATE.TITLE) {
         drawTitleScreen();
-      } else if (currentState === STATE.GAMEOVER) {
-        drawResultScreen(false);
-      } else if (currentState === STATE.CLEAR) {
-        drawResultScreen(true);
+      } else if (currentState === STATE.ROULETTE) {
+        drawOmikujiRoulette();
+      } else if (currentState === STATE.RESULT) {
+        drawResultScreen();
       }
 
       ctx.restore();
