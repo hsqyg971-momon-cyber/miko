@@ -1,0 +1,1062 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>お祓いスラッシュ - 巫女の邪気退散アクション</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      user-select: none;
+      -webkit-user-select: none;
+      touch-action: none;
+    }
+    body, html {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: radial-gradient(circle at 50% 30%, #30183e 0%, #170d24 70%, #0a0410 100%);
+      font-family: 'Hiragino Kaku Gothic ProN', 'Meiryo', sans-serif;
+      color: #fff;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+    #game-container {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      max-width: 540px;
+      max-height: 960px;
+      box-shadow: 0 0 35px rgba(255, 120, 180, 0.25);
+      background: #190c23;
+      overflow: hidden;
+    }
+    canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+    /* Simple custom UI layer overlay when needed */
+    .hidden {
+      display: none !important;
+    }
+  </style>
+</head>
+<body>
+  <div id="game-container">
+    <canvas id="gameCanvas"></canvas>
+  </div>
+
+  <script>
+    // --- Audio Synthesis via Web Audio API (No external sound files required) ---
+    const AudioEngine = {
+      ctx: null,
+      init() {
+        if (!this.ctx) {
+          const AudioContext = window.AudioContext || window.webkitAudioContext;
+          if (AudioContext) {
+            this.ctx = new AudioContext();
+          }
+        }
+        if (this.ctx && this.ctx.state === 'suspended') {
+          this.ctx.resume();
+        }
+      },
+      playSlash() {
+        if (!this.ctx) return;
+        const now = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(800, now);
+        osc.frequency.exponentialRampToValueAtTime(160, now + 0.12);
+        gain.gain.setValueAtTime(0.2, now);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.12);
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start(now);
+        osc.stop(now + 0.13);
+      },
+      playPurify() {
+        if (!this.ctx) return;
+        const now = this.ctx.currentTime;
+        // Kagura Suzur bell chime (bright bell harmonics)
+        [1760, 2637, 3520].forEach((freq, idx) => {
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(freq, now + idx * 0.02);
+          gain.gain.setValueAtTime(0.18, now + idx * 0.02);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.5 + idx * 0.05);
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc.start(now + idx * 0.02);
+          osc.stop(now + 0.6 + idx * 0.05);
+        });
+      },
+      playMistake() {
+        if (!this.ctx) return;
+        const now = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(150, now);
+        osc.frequency.linearRampToValueAtTime(80, now + 0.25);
+        gain.gain.setValueAtTime(0.3, now);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.25);
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start(now);
+        osc.stop(now + 0.26);
+      }
+    };
+
+    // --- Main Game Setup ---
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const container = document.getElementById('game-container');
+
+    let width = 0;
+    let height = 0;
+    let scale = 1;
+
+    // Game States
+    const STATE = {
+      TITLE: 0,
+      PLAYING: 1,
+      GAMEOVER: 2
+    };
+    let currentState = STATE.TITLE;
+
+    // Load Miko Image
+    const mikoImg = new Image();
+    let isMikoLoaded = false;
+    mikoImg.src = 'miko.png';
+    mikoImg.onload = () => { isMikoLoaded = true; };
+    mikoImg.onerror = () => { isMikoLoaded = false; };
+
+    // Core Game Variables
+    let score = 0;
+    let combo = 0;
+    let maxCombo = 0;
+    let comboTimer = 0;
+    let life = 3;
+    const MAX_LIFE = 3;
+    let gameTime = 0;
+    let spawnTimer = 0;
+    let difficultySpeed = 1;
+
+    // Entities & Effects
+    let objects = [];
+    let particles = [];
+    let textPopups = [];
+    let mikoAnim = {
+      bounceY: 0,
+      bellRingTime: 0,
+      scaleY: 1
+    };
+
+    // Slash Trail System
+    let slashPoints = [];
+    let isSlashing = false;
+
+    // Resize Handler
+    function resizeCanvas() {
+      const rect = container.getBoundingClientRect();
+      width = rect.width;
+      height = rect.height;
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width = width * dpr;
+      canvas.height = height * dpr;
+      ctx.scale(dpr, dpr);
+      scale = width / 400; // Relative layout scale
+    }
+    window.addEventListener('resize', resizeCanvas);
+    window.addEventListener('load', () => {
+      resizeCanvas();
+      requestAnimationFrame(gameLoop);
+    });
+
+    // --- Math & Collision Helpers ---
+    function dist(x1, y1, x2, y2) {
+      return Math.hypot(x2 - x1, y2 - y1);
+    }
+
+    // Check line segment (x1, y1)-(x2, y2) vs circle (cx, cy, r)
+    function checkLineCircleIntersection(x1, y1, x2, y2, cx, cy, r) {
+      const dx = x2 - x1;
+      const dy = y2 - y1;
+      const len = Math.hypot(dx, dy);
+      if (len === 0) return dist(x1, y1, cx, cy) <= r;
+
+      const u = Math.max(0, Math.min(1, ((cx - x1) * dx + (cy - y1) * dy) / (len * len)));
+      const nearestX = x1 + u * dx;
+      const nearestY = y1 + u * dy;
+      return dist(cx, cy, nearestX, nearestY) <= r;
+    }
+
+    // --- Input Handling ---
+    function getPointerPos(e) {
+      const rect = canvas.getBoundingClientRect();
+      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+      const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+      return {
+        x: clientX - rect.left,
+        y: clientY - rect.top
+      };
+    }
+
+    function onPointerDown(e) {
+      AudioEngine.init();
+      const pos = getPointerPos(e);
+
+      if (currentState === STATE.TITLE) {
+        // Start button area hit detection
+        const btnY = height * 0.72;
+        if (Math.abs(pos.x - width / 2) < 110 && Math.abs(pos.y - btnY) < 35) {
+          startGame();
+          return;
+        }
+      } else if (currentState === STATE.GAMEOVER) {
+        // Retry button area
+        const btnY = height * 0.76;
+        if (Math.abs(pos.x - width / 2) < 110 && Math.abs(pos.y - btnY) < 35) {
+          startGame();
+          return;
+        }
+      } else if (currentState === STATE.PLAYING) {
+        isSlashing = true;
+        slashPoints = [{ x: pos.x, y: pos.y, time: performance.now() }];
+      }
+    }
+
+    function onPointerMove(e) {
+      if (!isSlashing || currentState !== STATE.PLAYING) return;
+      const pos = getPointerPos(e);
+      const now = performance.now();
+      const last = slashPoints[slashPoints.length - 1];
+
+      if (!last || dist(last.x, last.y, pos.x, pos.y) > 4) {
+        slashPoints.push({ x: pos.x, y: pos.y, time: now });
+        if (last) {
+          testSlashCollision(last, pos);
+        }
+      }
+    }
+
+    function onPointerUp() {
+      isSlashing = false;
+    }
+
+    canvas.addEventListener('mousedown', onPointerDown);
+    canvas.addEventListener('mousemove', onPointerMove);
+    window.addEventListener('mouseup', onPointerUp);
+
+    canvas.addEventListener('touchstart', (e) => { e.preventDefault(); onPointerDown(e); }, { passive: false });
+    canvas.addEventListener('touchmove', (e) => { e.preventDefault(); onPointerMove(e); }, { passive: false });
+    window.addEventListener('touchend', onPointerUp);
+
+    // --- Game Logic ---
+    function startGame() {
+      score = 0;
+      combo = 0;
+      maxCombo = 0;
+      comboTimer = 0;
+      life = MAX_LIFE;
+      gameTime = 0;
+      spawnTimer = 0;
+      difficultySpeed = 1;
+      objects = [];
+      particles = [];
+      textPopups = [];
+      slashPoints = [];
+      currentState = STATE.PLAYING;
+    }
+
+    function spawnObject() {
+      // 82% 邪気玉 (Evil Aura), 18% お供え物 (Dango / Apple)
+      const isOffer = Math.random() < 0.18;
+      const offerType = Math.random() < 0.5 ? 'dango' : 'apple';
+      const radius = isOffer ? 22 : 24 + Math.random() * 4;
+      const x = radius + Math.random() * (width - radius * 2);
+      const baseSpeed = (160 + Math.random() * 90) * difficultySpeed;
+
+      objects.push({
+        x: x,
+        y: -radius - 10,
+        radius: radius,
+        speedY: baseSpeed / 60,
+        speedX: (Math.random() - 0.5) * 1.5,
+        type: isOffer ? 'offer' : 'evil',
+        offerVariant: offerType,
+        angle: 0,
+        rotSpeed: (Math.random() - 0.5) * 0.05,
+        pulse: Math.random() * Math.PI * 2,
+        sliced: false
+      });
+    }
+
+    function testSlashCollision(p1, p2) {
+      AudioEngine.playSlash();
+      for (let i = objects.length - 1; i >= 0; i--) {
+        const obj = objects[i];
+        if (obj.sliced) continue;
+
+        if (checkLineCircleIntersection(p1.x, p1.y, p2.x, p2.y, obj.x, obj.y, obj.radius)) {
+          obj.sliced = true;
+          handleCut(obj);
+          objects.splice(i, 1);
+        }
+      }
+    }
+
+    function handleCut(obj) {
+      if (obj.type === 'evil') {
+        // Successful purification
+        combo++;
+        if (combo > maxCombo) maxCombo = combo;
+        comboTimer = 140; // ~2.3 seconds combo grace period
+
+        const multiplier = 1 + Math.floor(combo / 5) * 0.5;
+        const gainedScore = Math.floor(100 * multiplier);
+        score += gainedScore;
+
+        AudioEngine.playPurify();
+
+        // Miko Reaction Trigger
+        mikoAnim.bounceY = -22;
+        mikoAnim.bellRingTime = 30;
+
+        // Visual feedback
+        createPurifyParticles(obj.x, obj.y);
+        addTextPopup(`+${gainedScore}`, obj.x, obj.y - 10, '#ffd166');
+        if (combo > 1) {
+          addTextPopup(`${combo} COMBO!`, obj.x, obj.y - 32, '#06d6a0');
+        }
+      } else {
+        // Slashed sacred offering!
+        combo = 0;
+        life = Math.max(0, life - 1);
+        AudioEngine.playMistake();
+        createMistakeParticles(obj.x, obj.y);
+        addTextPopup(`お供え物を斬ってしまった！`, obj.x, obj.y - 15, '#ff4d6d');
+
+        if (life <= 0) {
+          gameOver();
+        }
+      }
+    }
+
+    function gameOver() {
+      currentState = STATE.GAMEOVER;
+      isSlashing = false;
+    }
+
+    // --- Particle & Text Effects ---
+    function createPurifyParticles(x, y) {
+      // Golden sacred bell rings & sakura lights
+      for (let i = 0; i < 20; i++) {
+        const ang = Math.random() * Math.PI * 2;
+        const spd = 2 + Math.random() * 5;
+        particles.push({
+          x: x,
+          y: y,
+          vx: Math.cos(ang) * spd,
+          vy: Math.sin(ang) * spd - 1,
+          size: 3 + Math.random() * 4,
+          life: 1,
+          decay: 0.025 + Math.random() * 0.02,
+          color: ['#fff', '#ffe169', '#ff9ebb', '#b5e2fa'][Math.floor(Math.random() * 4)],
+          shape: Math.random() < 0.3 ? 'star' : 'circle'
+        });
+      }
+    }
+
+    function createMistakeParticles(x, y) {
+      for (let i = 0; i < 15; i++) {
+        const ang = Math.random() * Math.PI * 2;
+        const spd = 2 + Math.random() * 3.5;
+        particles.push({
+          x: x,
+          y: y,
+          vx: Math.cos(ang) * spd,
+          vy: Math.sin(ang) * spd,
+          size: 4 + Math.random() * 3,
+          life: 1,
+          decay: 0.03,
+          color: '#ff3366',
+          shape: 'circle'
+        });
+      }
+    }
+
+    function addTextPopup(text, x, y, color) {
+      textPopups.push({
+        text: text,
+        x: Math.max(50, Math.min(width - 50, x)),
+        y: y,
+        vy: -1.2,
+        life: 1,
+        decay: 0.02,
+        color: color
+      });
+    }
+
+    // --- Update Loops ---
+    function update(dt) {
+      gameTime += dt;
+      difficultySpeed = 1 + Math.min(1.2, gameTime / 70); // Gradually ramps up
+
+      // Slash Trail cleanup (older than 160ms fades)
+      const now = performance.now();
+      slashPoints = slashPoints.filter(p => now - p.time < 160);
+
+      // Miko Animation update
+      mikoAnim.bounceY += (0 - mikoAnim.bounceY) * 0.12;
+      if (mikoAnim.bellRingTime > 0) mikoAnim.bellRingTime--;
+
+      if (currentState !== STATE.PLAYING) return;
+
+      // Combo Decay
+      if (comboTimer > 0) {
+        comboTimer--;
+        if (comboTimer <= 0) combo = 0;
+      }
+
+      // Spawning
+      spawnTimer++;
+      const nextSpawnRate = Math.max(32, Math.floor(65 / difficultySpeed));
+      if (spawnTimer >= nextSpawnRate) {
+        spawnTimer = 0;
+        spawnObject();
+      }
+
+      // Update Falling Objects
+      for (let i = objects.length - 1; i >= 0; i--) {
+        const obj = objects[i];
+        obj.y += obj.speedY;
+        obj.x += obj.speedX;
+        obj.angle += obj.rotSpeed;
+        obj.pulse += 0.08;
+
+        // Screen boundary bounce
+        if (obj.x < obj.radius || obj.x > width - obj.radius) {
+          obj.speedX *= -1;
+        }
+
+        // Missed evil aura reaches bottom
+        if (obj.y - obj.radius > height) {
+          if (obj.type === 'evil') {
+            combo = 0;
+            life = Math.max(0, life - 1);
+            AudioEngine.playMistake();
+            addTextPopup('邪気を見失った！', obj.x, height - 40, '#ff4d6d');
+            if (life <= 0) {
+              gameOver();
+            }
+          }
+          objects.splice(i, 1);
+        }
+      }
+
+      // Update Particles
+      for (let i = particles.length - 1; i >= 0; i--) {
+        const p = particles[i];
+        p.x += p.vx;
+        p.y += p.vy;
+        p.vy += 0.08; // Gravity
+        p.life -= p.decay;
+        if (p.life <= 0) particles.splice(i, 1);
+      }
+
+      // Update Text Popups
+      for (let i = textPopups.length - 1; i >= 0; i--) {
+        const tp = textPopups[i];
+        tp.y += tp.vy;
+        tp.life -= tp.decay;
+        if (tp.life <= 0) textPopups.splice(i, 1);
+      }
+    }
+
+    // --- Rendering Functions ---
+
+    function drawBackground() {
+      // Atmospheric shrine night background with soft moon glow and sacred torii silhouette
+      const grad = ctx.createLinearGradient(0, 0, 0, height);
+      grad.addColorStop(0, '#1c0e2a');
+      grad.addColorStop(0.65, '#2e183f');
+      grad.addColorStop(1, '#11091a');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, width, height);
+
+      // Sacred moon glow
+      const moonGrad = ctx.createRadialGradient(width * 0.5, height * 0.18, 10, width * 0.5, height * 0.18, 120);
+      moonGrad.addColorStop(0, 'rgba(255, 235, 215, 0.45)');
+      moonGrad.addColorStop(0.5, 'rgba(255, 200, 220, 0.15)');
+      moonGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+      ctx.fillStyle = moonGrad;
+      ctx.beginPath();
+      ctx.arc(width * 0.5, height * 0.18, 120, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Distant Torii silhouette at bottom
+      ctx.save();
+      ctx.fillStyle = 'rgba(20, 10, 30, 0.65)';
+      const toriiW = 140;
+      const toriiX = width / 2;
+      const toriiY = height - 50;
+      // Pillars
+      ctx.fillRect(toriiX - toriiW * 0.35, toriiY - 110, 10, 120);
+      ctx.fillRect(toriiX + toriiW * 0.35 - 10, toriiY - 110, 10, 120);
+      // Top beams
+      ctx.fillRect(toriiX - toriiW * 0.5, toriiY - 110, toriiW, 11);
+      ctx.fillRect(toriiX - toriiW * 0.42, toriiY - 95, toriiW * 0.84, 8);
+      ctx.restore();
+    }
+
+    // Draw Evil Aura Object
+    function drawEvilAura(obj) {
+      ctx.save();
+      ctx.translate(obj.x, obj.y);
+
+      const pulseSize = Math.sin(obj.pulse) * 3;
+      const r = obj.radius + pulseSize;
+
+      // Outer ominous miasma
+      const outerGlow = ctx.createRadialGradient(0, 0, r * 0.2, 0, 0, r * 1.5);
+      outerGlow.addColorStop(0, 'rgba(170, 0, 255, 0.65)');
+      outerGlow.addColorStop(0.6, 'rgba(80, 0, 120, 0.3)');
+      outerGlow.addColorStop(1, 'rgba(0, 0, 0, 0)');
+      ctx.fillStyle = outerGlow;
+      ctx.beginPath();
+      ctx.arc(0, 0, r * 1.5, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Swirling spikes
+      ctx.rotate(obj.angle);
+      ctx.fillStyle = '#260438';
+      ctx.beginPath();
+      for (let i = 0; i < 8; i++) {
+        const rad = (i / 8) * Math.PI * 2;
+        const outerR = (i % 2 === 0) ? r * 1.25 : r * 0.8;
+        const px = Math.cos(rad) * outerR;
+        const py = Math.sin(rad) * outerR;
+        if (i === 0) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
+      }
+      ctx.closePath();
+      ctx.fill();
+
+      // Core Dark Orb with eerie glowing eye
+      const coreGrad = ctx.createRadialGradient(-r * 0.2, -r * 0.2, 2, 0, 0, r * 0.85);
+      coreGrad.addColorStop(0, '#be185d');
+      coreGrad.addColorStop(0.6, '#4a044e');
+      coreGrad.addColorStop(1, '#1e0527');
+      ctx.fillStyle = coreGrad;
+      ctx.beginPath();
+      ctx.arc(0, 0, r * 0.85, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Glowing malevolent glint
+      ctx.fillStyle = '#ff758f';
+      ctx.beginPath();
+      ctx.arc(-r * 0.25, -r * 0.25, r * 0.2, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.restore();
+    }
+
+    // Draw Sacred Offering (Dango or Apple)
+    function drawOffer(obj) {
+      ctx.save();
+      ctx.translate(obj.x, obj.y);
+      ctx.rotate(obj.angle);
+
+      // Sacred golden glow
+      const aura = ctx.createRadialGradient(0, 0, 5, 0, 0, obj.radius * 1.4);
+      aura.addColorStop(0, 'rgba(255, 230, 140, 0.6)');
+      aura.addColorStop(1, 'rgba(255, 230, 140, 0)');
+      ctx.fillStyle = aura;
+      ctx.beginPath();
+      ctx.arc(0, 0, obj.radius * 1.4, 0, Math.PI * 2);
+      ctx.fill();
+
+      if (obj.offerVariant === 'dango') {
+        // Skewer
+        ctx.strokeStyle = '#c89650';
+        ctx.lineWidth = 4;
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.moveTo(0, -obj.radius * 1.2);
+        ctx.lineTo(0, obj.radius * 1.3);
+        ctx.stroke();
+
+        // 3 Sanshoku Dango: Pink, White, Green
+        const colors = ['#ff99b0', '#ffffff', '#90e090'];
+        const offsets = [-14, 0, 14];
+        for (let k = 0; k < 3; k++) {
+          ctx.beginPath();
+          ctx.fillStyle = colors[k];
+          ctx.arc(0, offsets[k], 9.5, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.strokeStyle = '#deb887';
+          ctx.lineWidth = 1;
+          ctx.stroke();
+        }
+      } else {
+        // Glossy sacred Apple
+        ctx.fillStyle = '#e63946';
+        ctx.beginPath();
+        ctx.arc(-5, 0, 11, 0, Math.PI * 2);
+        ctx.arc(5, 0, 11, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Stem & Leaf
+        ctx.strokeStyle = '#6b4226';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(0, -9);
+        ctx.quadraticCurveTo(4, -16, 2, -18);
+        ctx.stroke();
+
+        ctx.fillStyle = '#52b788';
+        ctx.beginPath();
+        ctx.ellipse(5, -15, 6, 3, Math.PI / 4, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      ctx.restore();
+    }
+
+    // Draw Miko Character at Bottom Left with Animation
+    function drawMikoCharacter() {
+      ctx.save();
+      const mikoSize = 135 * scale;
+      const mikoX = 15;
+      const mikoY = height - mikoSize - 5 + mikoAnim.bounceY;
+
+      // Draw Bell Rings (Sound waves radiating when successful)
+      if (mikoAnim.bellRingTime > 0) {
+        const ringProgress = (30 - mikoAnim.bellRingTime) / 30;
+        ctx.strokeStyle = `rgba(255, 215, 0, ${1 - ringProgress})`;
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.arc(mikoX + mikoSize * 0.72, mikoY + mikoSize * 0.62, 10 + ringProgress * 45, 0, Math.PI * 2);
+        ctx.stroke();
+
+        // Sparkle stars
+        ctx.fillStyle = '#fff480';
+        ctx.font = '16px sans-serif';
+        ctx.fillText('✨', mikoX + mikoSize * 0.65 - ringProgress * 15, mikoY + mikoSize * 0.5 - ringProgress * 25);
+      }
+
+      if (isMikoLoaded) {
+        // Draw provided chibi miko image
+        ctx.shadowColor = 'rgba(255, 182, 193, 0.45)';
+        ctx.shadowBlur = 15;
+        // Rounded card frame for clean look
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(mikoX + mikoSize * 0.5, mikoY + mikoSize * 0.5, mikoSize * 0.48, 0, Math.PI * 2);
+        ctx.clip();
+        ctx.drawImage(mikoImg, mikoX, mikoY, mikoSize, mikoSize);
+        ctx.restore();
+
+        // Golden soft border ring
+        ctx.strokeStyle = 'rgba(255, 220, 150, 0.8)';
+        ctx.lineWidth = 3.5;
+        ctx.beginPath();
+        ctx.arc(mikoX + mikoSize * 0.5, mikoY + mikoSize * 0.5, mikoSize * 0.48, 0, Math.PI * 2);
+        ctx.stroke();
+      } else {
+        // Detailed Fallback Canvas Vector Character
+        ctx.translate(mikoX + mikoSize * 0.5, mikoY + mikoSize * 0.5);
+
+        // Body base circle/clip
+        ctx.fillStyle = '#ff758f';
+        ctx.beginPath();
+        ctx.arc(0, 0, mikoSize * 0.45, 0, Math.PI * 2);
+        ctx.fill();
+
+        // White kimono top
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        ctx.ellipse(0, mikoSize * 0.25, 28, 20, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Red Hakama dress
+        ctx.fillStyle = '#d90429';
+        ctx.beginPath();
+        ctx.moveTo(-25, mikoSize * 0.22);
+        ctx.lineTo(25, mikoSize * 0.22);
+        ctx.lineTo(32, mikoSize * 0.45);
+        ctx.lineTo(-32, mikoSize * 0.45);
+        ctx.closePath();
+        ctx.fill();
+
+        // Face
+        ctx.fillStyle = '#ffe5d9';
+        ctx.beginPath();
+        ctx.arc(0, -mikoSize * 0.08, 26, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Hair (Black twin pigtails & bangs)
+        ctx.fillStyle = '#211a21';
+        ctx.beginPath();
+        ctx.arc(0, -mikoSize * 0.12, 28, Math.PI, Math.PI * 2);
+        ctx.arc(-18, -mikoSize * 0.04, 10, 0, Math.PI * 2);
+        ctx.arc(18, -mikoSize * 0.04, 10, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Chibi Eyes
+        ctx.fillStyle = '#3a202c';
+        ctx.beginPath();
+        ctx.arc(-9, -mikoSize * 0.08, 3.5, 0, Math.PI * 2);
+        ctx.arc(9, -mikoSize * 0.08, 3.5, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Cheeks
+        ctx.fillStyle = 'rgba(255, 110, 140, 0.5)';
+        ctx.beginPath();
+        ctx.arc(-14, -mikoSize * 0.04, 4, 0, Math.PI * 2);
+        ctx.arc(14, -mikoSize * 0.04, 4, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Golden Kagura Suzur Bell in hand
+        ctx.fillStyle = '#f5c518';
+        ctx.beginPath();
+        ctx.arc(22, 10, 7, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = '#9e7500';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+
+    // Draw Dynamic Radiant Slash Line
+    function drawSlashTrail() {
+      if (slashPoints.length < 2) return;
+      const now = performance.now();
+
+      ctx.save();
+      for (let i = 1; i < slashPoints.length; i++) {
+        const p1 = slashPoints[i - 1];
+        const p2 = slashPoints[i];
+        const age = (now - p2.time) / 160;
+        if (age >= 1) continue;
+
+        const alpha = 1 - age;
+        const widthVal = (1 - age) * 11;
+
+        // Outer holy spirit aura (light blue / magenta)
+        ctx.beginPath();
+        ctx.moveTo(p1.x, p1.y);
+        ctx.lineTo(p2.x, p2.y);
+        ctx.lineCap = 'round';
+        ctx.strokeStyle = `rgba(180, 240, 255, ${alpha * 0.6})`;
+        ctx.lineWidth = widthVal + 10;
+        ctx.stroke();
+
+        // Inner glowing sacred blade
+        ctx.beginPath();
+        ctx.moveTo(p1.x, p1.y);
+        ctx.lineTo(p2.x, p2.y);
+        ctx.strokeStyle = `rgba(255, 255, 255, ${alpha})`;
+        ctx.lineWidth = widthVal;
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+
+    // Draw Particles & Floating Labels
+    function drawParticles() {
+      ctx.save();
+      for (const p of particles) {
+        ctx.fillStyle = p.color;
+        ctx.globalAlpha = Math.max(0, p.life);
+
+        if (p.shape === 'star') {
+          // Draw small four-point star
+          ctx.save();
+          ctx.translate(p.x, p.y);
+          ctx.beginPath();
+          for (let i = 0; i < 4; i++) {
+            ctx.rotate(Math.PI / 2);
+            ctx.lineTo(p.size * 1.5, 0);
+            ctx.lineTo(0, p.size * 0.4);
+          }
+          ctx.closePath();
+          ctx.fill();
+          ctx.restore();
+        } else {
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+      ctx.restore();
+
+      // Text Popups
+      ctx.save();
+      for (const tp of textPopups) {
+        ctx.globalAlpha = Math.max(0, tp.life);
+        ctx.font = 'bold 20px "Hiragino Kaku Gothic ProN", sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillStyle = tp.color;
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.8)';
+        ctx.shadowBlur = 6;
+        ctx.fillText(tp.text, tp.x, tp.y);
+      }
+      ctx.restore();
+    }
+
+    // Draw Top UI (Score, Combo, Heart Lives)
+    function drawUI() {
+      ctx.save();
+      // Upper banner background
+      const barGrad = ctx.createLinearGradient(0, 0, 0, 75);
+      barGrad.addColorStop(0, 'rgba(10, 4, 18, 0.85)');
+      barGrad.addColorStop(1, 'rgba(10, 4, 18, 0)');
+      ctx.fillStyle = barGrad;
+      ctx.fillRect(0, 0, width, 75);
+
+      // Score
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 15px sans-serif';
+      ctx.fillText('SCORE', 20, 28);
+      ctx.font = '900 28px sans-serif';
+      ctx.fillStyle = '#ffd166';
+      ctx.fillText(score.toLocaleString(), 20, 58);
+
+      // Combo Pill
+      if (combo > 1) {
+        ctx.save();
+        ctx.translate(width / 2, 38);
+        ctx.fillStyle = 'rgba(6, 214, 160, 0.25)';
+        ctx.strokeStyle = '#06d6a0';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.roundRect(-45, -16, 90, 32, 16);
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.fillStyle = '#06d6a0';
+        ctx.font = '900 16px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(`${combo} COMBO`, 0, 0);
+        ctx.restore();
+      }
+
+      // Life (Hearts)
+      const heartStartX = width - 28;
+      const heartSize = 16;
+      for (let i = 0; i < MAX_LIFE; i++) {
+        const hx = heartStartX - i * 28;
+        const hy = 38;
+        const filled = i < life;
+
+        ctx.save();
+        ctx.fillStyle = filled ? '#ff4d6d' : '#495057';
+        ctx.strokeStyle = '#ff758f';
+        ctx.lineWidth = 1.5;
+
+        // Heart shape
+        ctx.beginPath();
+        const topCurveHeight = heartSize * 0.3;
+        ctx.moveTo(hx, hy + topCurveHeight);
+        ctx.bezierCurveTo(hx, hy, hx - heartSize / 2, hy, hx - heartSize / 2, hy + topCurveHeight);
+        ctx.bezierCurveTo(hx - heartSize / 2, hy + (heartSize + topCurveHeight) / 2, hx, hy + heartSize, hx, hy + heartSize);
+        ctx.bezierCurveTo(hx, hy + heartSize, hx + heartSize / 2, hy + (heartSize + topCurveHeight) / 2, hx + heartSize / 2, hy + topCurveHeight);
+        ctx.bezierCurveTo(hx + heartSize / 2, hy, hx, hy, hx, hy + topCurveHeight);
+        ctx.closePath();
+        ctx.fill();
+        if (filled) ctx.stroke();
+        ctx.restore();
+      }
+
+      ctx.restore();
+    }
+
+    // Draw Title Screen
+    function drawTitleScreen() {
+      ctx.save();
+      // Translucent wash
+      ctx.fillStyle = 'rgba(10, 4, 18, 0.72)';
+      ctx.fillRect(0, 0, width, height);
+
+      // Title Banner
+      ctx.textAlign = 'center';
+      ctx.shadowColor = 'rgba(255, 120, 180, 0.7)';
+      ctx.shadowBlur = 20;
+
+      ctx.fillStyle = '#ffd166';
+      ctx.font = 'bold 16px sans-serif';
+      ctx.fillText('〜 巫女の邪気退散アクション 〜', width / 2, height * 0.22);
+
+      ctx.fillStyle = '#ffffff';
+      ctx.font = '900 42px sans-serif';
+      ctx.fillText('お祓いスラッシュ', width / 2, height * 0.29);
+
+      // Rules Card
+      ctx.shadowBlur = 0;
+      const cardW = Math.min(width - 40, 360);
+      const cardX = (width - cardW) / 2;
+      const cardY = height * 0.35;
+      const cardH = 210;
+
+      ctx.fillStyle = 'rgba(35, 18, 48, 0.85)';
+      ctx.strokeStyle = 'rgba(255, 200, 220, 0.4)';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.roundRect(cardX, cardY, cardW, cardH, 18);
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 16px sans-serif';
+      ctx.fillText('【 遊び方 】', width / 2, cardY + 36);
+
+      ctx.font = '14px sans-serif';
+      ctx.fillStyle = '#e2e8f0';
+      ctx.fillText('⚡ 画面をスラッシュして「邪気」を一閃！', width / 2, cardY + 74);
+      ctx.fillText('🍡「お供え物（団子・林檎）」は斬っちゃダメ！', width / 2, cardY + 108);
+      ctx.fillText('🔔 邪気を逃すとお手付き（ライフ -1）', width / 2, cardY + 142);
+      ctx.fillText('🌸 連続でお祓いするとコンボボーナス！', width / 2, cardY + 176);
+
+      // Start Button
+      const btnY = height * 0.72;
+      const btnGrad = ctx.createLinearGradient(width / 2 - 100, 0, width / 2 + 100, 0);
+      btnGrad.addColorStop(0, '#e63946');
+      btnGrad.addColorStop(1, '#ff758f');
+
+      ctx.shadowColor = 'rgba(230, 57, 70, 0.8)';
+      ctx.shadowBlur = 15;
+      ctx.fillStyle = btnGrad;
+      ctx.beginPath();
+      ctx.roundRect(width / 2 - 100, btnY - 26, 200, 52, 26);
+      ctx.fill();
+
+      ctx.shadowBlur = 0;
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 20px sans-serif';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('祓いを始める', width / 2, btnY);
+
+      ctx.restore();
+    }
+
+    // Draw Game Over Screen
+    function drawGameOverScreen() {
+      ctx.save();
+      ctx.fillStyle = 'rgba(10, 4, 18, 0.84)';
+      ctx.fillRect(0, 0, width, height);
+
+      ctx.textAlign = 'center';
+      ctx.shadowColor = 'rgba(255, 77, 109, 0.8)';
+      ctx.shadowBlur = 20;
+
+      ctx.fillStyle = '#ff4d6d';
+      ctx.font = '900 36px sans-serif';
+      ctx.fillText('お祓い失敗...', width / 2, height * 0.26);
+
+      // Result Box
+      ctx.shadowBlur = 0;
+      const cardW = Math.min(width - 40, 360);
+      const cardX = (width - cardW) / 2;
+      const cardY = height * 0.33;
+      const cardH = 220;
+
+      ctx.fillStyle = 'rgba(35, 18, 48, 0.9)';
+      ctx.strokeStyle = 'rgba(255, 200, 220, 0.3)';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.roundRect(cardX, cardY, cardW, cardH, 18);
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.fillStyle = '#adb5bd';
+      ctx.font = 'bold 15px sans-serif';
+      ctx.fillText('FINAL SCORE', width / 2, cardY + 45);
+
+      ctx.fillStyle = '#ffd166';
+      ctx.font = '900 40px sans-serif';
+      ctx.fillText(score.toLocaleString(), width / 2, cardY + 92);
+
+      ctx.fillStyle = '#06d6a0';
+      ctx.font = 'bold 18px sans-serif';
+      ctx.fillText(`最大連続コンボ: ${maxCombo} 回`, width / 2, cardY + 142);
+
+      // Praise title by score
+      let rankText = '見習い巫女級';
+      if (score >= 5000) rankText = '神代の霊力巫女級 ✨';
+      else if (score >= 2500) rankText = '熟練の一級巫女級 🌸';
+      else if (score >= 1000) rankText = '頼れる本堂巫女級 🔔';
+      ctx.fillStyle = '#f8f9fa';
+      ctx.font = '15px sans-serif';
+      ctx.fillText(`社务所評価: ${rankText}`, width / 2, cardY + 182);
+
+      // Retry Button
+      const btnY = height * 0.76;
+      const btnGrad = ctx.createLinearGradient(width / 2 - 100, 0, width / 2 + 100, 0);
+      btnGrad.addColorStop(0, '#06d6a0');
+      btnGrad.addColorStop(1, '#118ab2');
+
+      ctx.shadowColor = 'rgba(6, 214, 160, 0.6)';
+      ctx.shadowBlur = 15;
+      ctx.fillStyle = btnGrad;
+      ctx.beginPath();
+      ctx.roundRect(width / 2 - 100, btnY - 26, 200, 52, 26);
+      ctx.fill();
+
+      ctx.shadowBlur = 0;
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 20px sans-serif';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('もう一度祓う', width / 2, btnY);
+
+      ctx.restore();
+    }
+
+    // --- Main Game Loop ---
+    let lastTimestamp = performance.now();
+    function gameLoop(timestamp) {
+      const dt = Math.min((timestamp - lastTimestamp) / 1000, 0.1);
+      lastTimestamp = timestamp;
+
+      // Update
+      update(dt);
+
+      // Render
+      ctx.clearRect(0, 0, width, height);
+      drawBackground();
+
+      // Draw Entities
+      for (const obj of objects) {
+        if (obj.type === 'evil') drawEvilAura(obj);
+        else drawOffer(obj);
+      }
+
+      // Draw Miko Character, Slash trail & visual FX
+      drawMikoCharacter();
+      drawSlashTrail();
+      drawParticles();
+
+      // UI / Overlays
+      if (currentState === STATE.PLAYING) {
+        drawUI();
+      } else if (currentState === STATE.TITLE) {
+        drawTitleScreen();
+      } else if (currentState === STATE.GAMEOVER) {
+        drawGameOverScreen();
+      }
+
+      requestAnimationFrame(gameLoop);
+    }
+  </script>
+</body>
+</html>
